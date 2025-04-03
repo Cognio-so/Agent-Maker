@@ -4,6 +4,7 @@ import SignupPage from './pages/SignupPage'
 import LoginPage from './pages/LoginPage'
 import UserPage from './pages/UserPage'
 import AdminPage from './pages/Adminpage'
+import Homepage from './pages/Homepage'
 function App() {
   useEffect(() => {
     // Initialize Google client
@@ -27,6 +28,7 @@ function App() {
 
   return (
     <Routes>
+      <Route path="/" element={<Homepage/>} />
       <Route path="/user" element={<UserPage/>} />
       <Route path="/admin" element={<AdminPage/>} />
       <Route path="/login" element={<LoginPage />} />
