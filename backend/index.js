@@ -19,8 +19,10 @@ app.use(express.json());
 app.use(cookieParser()); // Make sure this is included
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'https://agent-maker-frontend.vercel.app',
-  credentials: true // This is important for cookies
+  origin: process.env.FRONTEND_URL,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],  // Add OPTIONS for CORS preflight
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
 }));
 
 app.use(session({
