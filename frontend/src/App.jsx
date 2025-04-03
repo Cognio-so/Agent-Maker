@@ -3,8 +3,8 @@ import { Routes, Route } from 'react-router-dom'
 import SignupPage from './pages/SignupPage'
 import LoginPage from './pages/LoginPage'
 import UserPage from './pages/UserPage'
-import AdminPage from './pages/Adminpage'
 import Homepage from './pages/Homepage'
+import AdminPage from './pages/AdminPage  '
 function App() {
   useEffect(() => {
     // Initialize Google client
