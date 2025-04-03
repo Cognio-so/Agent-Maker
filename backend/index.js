@@ -52,10 +52,14 @@ app.get("/health", (req, res) => {
 });
 // --- End Health Check Endpoint ---
 
+// Initialize MongoDB connection at startup
+connectDB()
+  .then(() => console.log('MongoDB connected at server startup'))
+  .catch(err => console.error('Initial MongoDB connection failed:', err));
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
-  connectDB();
 });
 
 
