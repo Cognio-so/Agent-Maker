@@ -94,8 +94,8 @@ const googleAuthCallback = (req, res, next) => {
 
       // Redirect based on user role
       const redirectUrl = user.role === 'admin' 
-        ? `${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin`
-        : `${process.env.FRONTEND_URL || 'http://localhost:5173'}/user`;
+        ? `${process.env.FRONTEND_URL || 'https://agent-maker-frontend.vercel.app'}/admin`
+        : `${process.env.FRONTEND_URL || 'https://agent-maker-frontend.vercel.app'}/user`;
         
       return res.redirect(redirectUrl);
     });
