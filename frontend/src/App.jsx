@@ -4,7 +4,7 @@ import SignupPage from './pages/SignupPage'
 import LoginPage from './pages/LoginPage'
 import UserPage from './pages/UserPage'
 import Homepage from './pages/Homepage'
-import AdminPage from './pages/AdminPage  '
+import AdminPage from './pages/Adminpage'
 function App() {
   useEffect(() => {
     // Initialize Google client
