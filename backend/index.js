@@ -38,6 +38,11 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+// --- Add Root Route Handler ---
+app.get("/", (req, res) => {
+  res.status(200).send("API is running successfully!"); // You can change this message
+});
+// --- End Root Route Handler ---
 
 app.use('/api/auth', authRoutes);
 
