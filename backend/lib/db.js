@@ -1,42 +1,41 @@
 const mongoose = require("mongoose");
 
-// Cache the MongoDB connection
-let cachedConnection = null;
+// Global connection promise that can be awaited
+let dbConnectionPromise = null;
 
 const connectDB = async () => {
-    // If a connection exists, use it
-    if (cachedConnection) {
-        console.log("Using existing MongoDB connection");
-        return cachedConnection;
+    // Return existing connection promise if it exists
+    if (dbConnectionPromise) {
+        return dbConnectionPromise;
     }
 
+    // Create new connection promise
+    dbConnectionPromise = mongoose.connect(process.env.MONGO_URI, {
+        serverSelectionTimeoutMS: 30000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: 10,
+        // Remove bufferCommands: false to allow buffering
+    });
+    
     try {
-        // If no connection, create a new one
-        const conn = await mongoose.connect(process.env.MONGO_URI, {
-            serverSelectionTimeoutMS: 30000, // Longer timeout for Vercel
-            socketTimeoutMS: 45000,
-            maxPoolSize: 10, // Reduced pool size for serverless
-            bufferCommands: false, // Disable command buffering
-        });
-        
+        await dbConnectionPromise;
         console.log("MongoDB connected successfully");
-        cachedConnection = mongoose.connection;
         
         mongoose.connection.on('error', err => {
             console.error('MongoDB connection error:', err);
-            cachedConnection = null; // Reset on error
+            dbConnectionPromise = null; // Reset on error
         });
 
         mongoose.connection.on('disconnected', () => {
             console.log('MongoDB disconnected');
-            cachedConnection = null; // Reset on disconnect
+            dbConnectionPromise = null; // Reset on disconnect
         });
-
-        return cachedConnection;
-
+        
+        return dbConnectionPromise;
     } catch (error) {
         console.error("MongoDB connection error:", error);
-        process.exit(1);
+        dbConnectionPromise = null;
+        throw error;
     }
 };
 

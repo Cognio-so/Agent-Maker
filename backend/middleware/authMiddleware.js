@@ -1,8 +1,12 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const connectDB = require('../lib/db');
 
 const protectRoute = async (req, res, next) => {
     try {
+        // Ensure database is connected before proceeding
+        await connectDB();
+        
         const token = req.cookies.token;
 
         if (!token) {
