@@ -4,7 +4,8 @@ import SignupPage from './pages/SignupPage'
 import LoginPage from './pages/LoginPage'
 import UserPage from './pages/UserPage'
 import Homepage from './pages/Homepage'
-import AdminPage from './pages/Admin'
+import Admin from './pages/Admin'
+
 function App() {
   useEffect(() => {
     // Initialize Google client
@@ -27,13 +28,13 @@ function App() {
   }, []);
 
   return (
-    <Routes>
-      <Route path="/" element={<Homepage/>} />
-      <Route path="/user" element={<UserPage/>} />
-      <Route path="/admin" element={<AdminPage/>} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
-    </Routes>
+        <Routes>
+          <Route path="/" element={<Homepage/>} />
+          <Route path="/user" element={<UserPage/>} />
+          <Route path="/admin/*" element={<Admin />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+        </Routes>
   )
 }
 

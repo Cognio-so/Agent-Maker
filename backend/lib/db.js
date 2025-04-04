@@ -4,6 +4,8 @@ const mongoose = require("mongoose");
 let dbConnectionPromise = null;
 
 const connectDB = async () => {
+    
+
     // Return existing connection promise if it exists
     if (dbConnectionPromise) {
         return dbConnectionPromise;
@@ -18,24 +20,20 @@ const connectDB = async () => {
     });
     
     try {
-        await dbConnectionPromise;
-        console.log("MongoDB connected successfully");
-        
+        const conn = await dbConnectionPromise;        
         mongoose.connection.on('error', err => {
             console.error('MongoDB connection error:', err);
             dbConnectionPromise = null; // Reset on error
         });
 
         mongoose.connection.on('disconnected', () => {
-            console.log('MongoDB disconnected');
             dbConnectionPromise = null; // Reset on disconnect
         });
         
-        return dbConnectionPromise;
+        return conn;
     } catch (error) {
-        console.error("MongoDB connection error:", error);
-        dbConnectionPromise = null;
-        throw error;
+        console.error(`Error: ${error.message}`);
+        process.exit(1);
     }
 };
 

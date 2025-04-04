@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
     IoGridOutline,
     IoFolderOpenOutline,
@@ -12,14 +13,16 @@ import {
     IoMenuOutline
 } from 'react-icons/io5';
 
+// API URL from environment variables
+
 const AdminSidebar = ({ activePage = 'dashboard', onNavigate }) => {
-    const [isCollapsed, setIsCollapsed] = React.useState(false);
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
-    const [activeItem, setActiveItem] = React.useState(activePage);
+    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [activeItem, setActiveItem] = useState(activePage);
     const navigate = useNavigate();
 
     // Update activeItem when activePage prop changes
-    React.useEffect(() => {
+    useEffect(() => {
         setActiveItem(activePage);
     }, [activePage]);
 
@@ -41,7 +44,7 @@ const AdminSidebar = ({ activePage = 'dashboard', onNavigate }) => {
         }
     };
 
-    React.useEffect(() => {
+    useEffect(() => {
         const handleResize = () => {
             if (window.innerWidth < 768) {
                 setIsCollapsed(true);
@@ -63,13 +66,12 @@ const AdminSidebar = ({ activePage = 'dashboard', onNavigate }) => {
     };
 
     const handleNavigation = (itemId) => {
-        setActiveItem(itemId);
         if (onNavigate) {
             onNavigate(itemId);
         }
 
-        if (window.innerWidth < 768) {
-            setIsMobileMenuOpen(false);
+        if (window.innerWidth < 768 && isMobileMenuOpen) {
+            toggleMobileMenu();
         }
     };
 
@@ -100,10 +102,10 @@ const AdminSidebar = ({ activePage = 'dashboard', onNavigate }) => {
             )}
 
             <div
-                className={`fixed md:relative h-screen bg-[#121212] text-white flex flex-col justify-between transition-all duration-300 ease-in-out z-40
-          ${isCollapsed ? 'w-[70px]' : 'w-[240px]'}
-          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-        `}
+                className={`fixed md:relative h-screen bg-[#121212] text-white flex flex-col justify-between transition-all duration-300 ease-in-out z-50
+                    ${isCollapsed ? 'w-[70px]' : 'w-[240px]'}
+                    ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+                `}
             >
                 <div>
                     <div className={`px-4 py-6 mb-4 flex ${isCollapsed ? 'justify-center' : 'justify-between'} items-center`}>
@@ -121,8 +123,9 @@ const AdminSidebar = ({ activePage = 'dashboard', onNavigate }) => {
                             <button
                                 key={item.id}
                                 onClick={() => handleNavigation(item.id)}
-                                className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} px-4 py-3 rounded-lg text-left transition-colors ${activeItem === item.id
-                                        ? 'bg-white/10 text-white'
+                                className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} w-full px-4 py-3 rounded-lg text-left transition-colors ${
+                                    activePage === item.id || (activePage === 'collections' && (item.id === 'create-gpt' || item.id.startsWith('edit-gpt'))) 
+                                        ? 'bg-white/10 text-white' 
                                         : 'text-gray-400 hover:bg-white/5 hover:text-white'
                                     }`}
                                 title={isCollapsed ? item.label : ''}
@@ -134,7 +137,7 @@ const AdminSidebar = ({ activePage = 'dashboard', onNavigate }) => {
                     </div>
                 </div>
 
-                <div className="px-2 pb-6">
+                <div className="px-2 pb-6 mt-auto">
                     <button
                         onClick={handleLogout}
                         className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} w-full px-4 py-3 text-gray-400 hover:bg-white/5 hover:text-white rounded-lg text-left transition-colors hover:bg-red-900/20 hover:text-red-300`}

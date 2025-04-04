@@ -4,35 +4,12 @@ import CreateCustomGpt from './CreateCustomGpt';
 import { FiSearch, FiChevronDown, FiChevronUp, FiGrid, FiList, FiMenu } from 'react-icons/fi';
 import AgentCard from './AgentCard';
 import CategorySection from './CategorySection';
+import axios from 'axios';
 
-// Sample image URLs
-const agentImage1 = "/images/agent1.png";
-const agentImage2 = "/images/agent2.png";
-const agentImage3 = "/images/agent3.png";
-const agentImage4 = "/images/agent4.png";
+// Default image for agents without images
 
-// Sample data for agents (with categories)
-const agentsData = {
-    featured: [
-        { image: agentImage1, name: "Agent-1", status: "online", userCount: 50, messageCount: 120, modelType: "GPT-3.5" },
-        { image: agentImage2, name: "Agent-2", status: "offline", userCount: 30, messageCount: 55, modelType: "GPT-4" },
-        { image: agentImage3, name: "Agent-3", status: "online", userCount: 75, messageCount: 200, modelType: "Gemini Pro" },
-        { image: agentImage4, name: "Agent-4", status: "offline", userCount: 40, messageCount: 78, modelType: "Claude 2" }
-    ],
-    
-    productivity: [
-        { image: agentImage1, name: "Task Master", status: "online", userCount: 85, messageCount: 340, modelType: "GPT-4" },
-        { image: agentImage3, name: "Work Planner", status: "online", userCount: 62, messageCount: 180, modelType: "Claude 2" }
-    ],
-    education: [
-        { image: agentImage2, name: "Study Buddy", status: "offline", userCount: 120, messageCount: 450, modelType: "GPT-3.5" },
-        { image: agentImage4, name: "Math Tutor", status: "online", userCount: 95, messageCount: 320, modelType: "Gemini Pro" }
-    ],
-    entertainment: [
-        { image: agentImage3, name: "Game Expert", status: "online", userCount: 45, messageCount: 210, modelType: "GPT-4" },
-        { image: agentImage1, name: "Movie Guide", status: "offline", userCount: 70, messageCount: 280, modelType: "Claude 2" }
-    ]
-};
+// API URL from environment variables
+const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 const AdminDashboard = ({ userName = "Admin User" }) => {
     const [showCreateGpt, setShowCreateGpt] = useState(false);
@@ -43,7 +20,90 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
     const sortOptions = ['Default', 'Latest', 'Older'];
     const dropdownRef = useRef(null);
     const [showSidebar, setShowSidebar] = useState(false);
-
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [agentsData, setAgentsData] = useState({
+        featured: [],
+        productivity: [],
+        education: [],
+        entertainment: []
+    });
+    
+    // Fetch agents data from the backend
+    useEffect(() => {
+        const fetchAgents = async () => {
+            try {
+                setLoading(true);
+                const response = await axios.get(`${API_URL}/api/custom-gpts`, { withCredentials: true });
+                
+                if (response.data.success && response.data.customGpts) {
+                    // Sort by creation date (newest first)
+                    const sortedGpts = [...response.data.customGpts].sort((a, b) => 
+                        new Date(b.createdAt) - new Date(a.createdAt)
+                    );
+                    
+                    // Categorize GPTs based on their description or name
+                    const categorizedData = {
+                        featured: [],
+                        productivity: [],
+                        education: [],
+                        entertainment: []
+                    };
+                    
+                    // Take the 4 most recent for featured
+                    categorizedData.featured = sortedGpts.slice(0, 4).map(gpt => ({
+                        image: gpt.imageUrl || defaultAgentImage,
+                        name: gpt.name,
+                        status: Math.random() > 0.5 ? 'online' : 'offline', // Random status for demo
+                        userCount: Math.floor(Math.random() * 100) + 10, // Random metrics for demo
+                        messageCount: Math.floor(Math.random() * 400) + 50,
+                        modelType: gpt.model
+                    }));
+                    
+                    // Categorize the rest based on keywords in description or name
+                    sortedGpts.forEach(gpt => {
+                        const text = (gpt.description + ' ' + gpt.name).toLowerCase();
+                        const agent = {
+                            image: gpt.imageUrl || defaultAgentImage,
+                            name: gpt.name,
+                            status: Math.random() > 0.5 ? 'online' : 'offline',
+                            userCount: Math.floor(Math.random() * 100) + 10,
+                            messageCount: Math.floor(Math.random() * 400) + 50,
+                            modelType: gpt.model
+                        };
+                        
+                        // Skip if already in featured
+                        if (categorizedData.featured.some(a => a.name === gpt.name)) {
+                            return;
+                        }
+                        
+                        if (text.includes('work') || text.includes('task') || text.includes('productivity')) {
+                            categorizedData.productivity.push(agent);
+                        } else if (text.includes('learn') || text.includes('study') || text.includes('education')) {
+                            categorizedData.education.push(agent);
+                        } else if (text.includes('game') || text.includes('movie') || text.includes('fun')) {
+                            categorizedData.entertainment.push(agent);
+                        } else {
+                            // Random assignment if no match
+                            const categories = ['productivity', 'education', 'entertainment'];
+                            const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+                            categorizedData[randomCategory].push(agent);
+                        }
+                    });
+                    
+                    setAgentsData(categorizedData);
+                }
+            } catch (err) {
+                console.error("Error fetching agents:", err);
+                setError("Failed to load agents data");
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        fetchAgents();
+    }, []);
+    
     // Handle window resize
     useEffect(() => {
         const handleResize = () => {
@@ -69,7 +129,23 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
             );
         });
         return filtered;
-    }, [searchTerm]);
+    }, [searchTerm, agentsData]);
+
+    // Sort agents based on sort option
+    useEffect(() => {
+        if (sortOption === 'Default') return;
+        
+        const sortedAgents = {...agentsData};
+        const sortFn = sortOption === 'Latest' 
+            ? (a, b) => b.userCount - a.userCount 
+            : (a, b) => a.userCount - b.userCount;
+            
+        Object.keys(sortedAgents).forEach(category => {
+            sortedAgents[category] = [...sortedAgents[category]].sort(sortFn);
+        });
+        
+        setAgentsData(sortedAgents);
+    }, [sortOption]);
 
     // Close dropdown if clicked outside
     useEffect(() => {
@@ -94,6 +170,32 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
     const hasSearchResults = Object.values(filteredAgentsData).some(
         category => category.length > 0
     );
+
+    // Loading state
+    if (loading) {
+        return (
+            <div className="flex h-screen bg-black text-white items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+        );
+    }
+
+    // Error state
+    if (error) {
+        return (
+            <div className="flex h-screen bg-black text-white items-center justify-center">
+                <div className="text-center p-4">
+                    <p className="text-red-500 mb-2">{error}</p>
+                    <button 
+                        onClick={() => window.location.reload()}
+                        className="bg-blue-600 px-4 py-2 rounded text-white"
+                    >
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-screen bg-black text-white overflow-hidden">

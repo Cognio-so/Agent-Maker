@@ -1,12 +1,14 @@
+const dotenv = require('dotenv');
+dotenv.config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
-const dotenv = require('dotenv');
 const passport = require('passport');
 const session = require('express-session');
 const connectDB = require('./lib/db');
-dotenv.config();
+const customGptRoutes = require('./routes/customGptRoutes');
 
 const authRoutes = require('./routes/authRoutes');
 
@@ -19,7 +21,7 @@ app.use(express.json());
 app.use(cookieParser()); // Make sure this is included
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL,
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],  // Add OPTIONS for CORS preflight
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
@@ -47,6 +49,7 @@ app.get("/", (req, res) => {
 // --- End Root Route Handler ---
 
 app.use('/api/auth', authRoutes);
+app.use('/api/custom-gpts', customGptRoutes);
 
 // --- Add Health Check Endpoint ---
 app.get("/health", (req, res) => {
