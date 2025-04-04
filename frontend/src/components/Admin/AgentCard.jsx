@@ -6,22 +6,22 @@ const AgentCard = ({ agentImage, agentName, status, userCount, messageCount, mod
     const statusColor = status === 'online' ? 'text-green-500' : 'text-red-500';
     
     return (
-        <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-4 border border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] group">
-            <div className="flex items-center mb-3">
-                <img src={agentImage} alt={agentName} className="w-10 h-10 rounded-full mr-3 p-0.5" />
-                <h3 className="text-base font-semibold transition-colors">{agentName}</h3>
+        <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-3 sm:p-4 border border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] group">
+            <div className="flex items-center mb-2 sm:mb-3">
+                <img src={agentImage} alt={agentName} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full mr-2 sm:mr-3 p-0.5 object-cover" />
+                <h3 className="text-sm sm:text-base font-semibold transition-colors text-white">{agentName}</h3>
                 <FaCircle className={`ml-auto ${statusColor} text-[0.4rem]`} />
             </div>
-            <div className="flex items-center gap-4 text-gray-400 text-sm">
+            <div className="flex items-center gap-2 sm:gap-4 text-gray-400 text-xs sm:text-sm">
                 <div className="flex items-center">
-                    <FaUsers className="mr-1.5 text-[0.65rem]" />
+                    <FaUsers className="mr-1 sm:mr-1.5 text-[0.6rem] sm:text-[0.65rem]" />
                     <span>{userCount}</span>
                 </div>
                 <div className="flex items-center">
-                    <FaCommentDots className="mr-1.5 text-[0.65rem]" />
+                    <FaCommentDots className="mr-1 sm:mr-1.5 text-[0.6rem] sm:text-[0.65rem]" />
                     <span>{messageCount}</span>
                 </div>
-                <div className="ml-auto px-2 py-0.5 bg-gray-700 rounded text-xs">{modelType}</div>
+                <div className="ml-auto px-1.5 sm:px-2 py-0.5 bg-gray-700 rounded text-[0.65rem] sm:text-xs">{modelType}</div>
             </div>
         </div>
     );
