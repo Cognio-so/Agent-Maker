@@ -24,6 +24,10 @@ const userSchema = new Schema({
     profilePic: {
         type: String,
         default: null
+    },
+    lastActive: {
+        type: Date,
+        default: null
     }
 }, {timestamps:true});
     

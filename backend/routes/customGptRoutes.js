@@ -7,35 +7,44 @@ const {
     updateCustomGpt, 
     deleteCustomGpt,
     deleteKnowledgeFile,
-    uploadMiddleware
+    uploadMiddleware,
+    getAllCustomGpts,
+    getUserAssignedGpts,
+    assignGptToUser,
+    unassignGptFromUser,
+    getUserGptCount,
+    getAssignedGptById
 } = require('../controllers/customGptController');
 const { protectRoute } = require('../middleware/authMiddleware');
 
-// All routes are protected with authentication
+// All routes need authentication
 router.use(protectRoute);
 
-// Use the combined middleware for creation and update
-router.post(
-    '/', 
-    uploadMiddleware,
-    createCustomGpt
-);
+// Root route - this should handle /api/custom-gpts GET requests
+router.get('/', getAllCustomGpts);
 
-// Get all custom GPTs for authenticated user
-router.get('/', getUserCustomGpts);
+// User-specific GPTs
+router.get('/user', getUserCustomGpts);
 
-// Get, update, delete a specific custom GPT
+// Team routes (need to come before /:id routes)
+router.get('/team/gpt-counts', getUserGptCount);
+router.get('/team/members/:userId/gpts', getUserAssignedGpts);
+router.post('/team/members/:userId/gpts', assignGptToUser);
+router.delete('/team/members/:userId/gpts/:gptId', unassignGptFromUser);
+
+// Create new GPT
+router.post('/', uploadMiddleware, createCustomGpt);
+
+// Parameter routes - MUST be last
 router.get('/:id', getCustomGptById);
-
-router.put(
-    '/:id', 
-    uploadMiddleware,
-    updateCustomGpt
-);
-
+router.put('/:id', uploadMiddleware, updateCustomGpt);
 router.delete('/:id', deleteCustomGpt);
-
-// Delete a knowledge file
 router.delete('/:id/knowledge/:fileIndex', deleteKnowledgeFile);
+
+// Get assigned GPT by ID for the current user
+router.get('/user/assigned/:id', protectRoute, getAssignedGptById);
+
+// User assigned GPTs (for regular users to see their collections)
+router.get('/user/assigned', protectRoute, getUserAssignedGpts);
 
 module.exports = router; 

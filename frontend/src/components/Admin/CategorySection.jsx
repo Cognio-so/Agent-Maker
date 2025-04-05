@@ -1,9 +1,11 @@
 import React from 'react';
 import AgentCard from './AgentCard';
+import { useNavigate } from 'react-router-dom';
 
 const CategorySection = ({ title, agentCount, agents }) => {
     // Detect mobile view
     const [isMobileView, setIsMobileView] = React.useState(false);
+    const navigate = useNavigate();
     
     React.useEffect(() => {
         const handleResize = () => {
@@ -17,11 +19,14 @@ const CategorySection = ({ title, agentCount, agents }) => {
     }, []);
     
     // Mobile agent item
-    const MobileAgentItem = ({ agent }) => {
+    const MobileAgentItem = ({ agent, onClick }) => {
         const statusColor = agent.status === 'online' ? 'bg-green-500' : 'bg-red-500';
         
         return (
-            <div className="p-3 border-b border-gray-800 w-full flex items-center">
+            <div 
+                className="p-3 border-b border-gray-800 w-full flex items-center cursor-pointer"
+                onClick={onClick}
+            >
                 <div className="flex-shrink-0 mr-3">
                     <img src={agent.image} alt={agent.name} className="w-10 h-10 rounded-full object-cover" />
                 </div>
@@ -53,7 +58,11 @@ const CategorySection = ({ title, agentCount, agents }) => {
                 // Mobile list view
                 <div className="bg-gray-900 rounded-lg overflow-hidden mb-4">
                     {agents.map((agent, index) => (
-                        <MobileAgentItem key={index} agent={agent} />
+                        <MobileAgentItem 
+                            key={index} 
+                            agent={agent} 
+                            onClick={() => navigate(`/admin/chat/${agent.id}`)} 
+                        />
                     ))}
                 </div>
             ) : (

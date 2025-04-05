@@ -3,6 +3,9 @@ const { uploadToR2, deleteFromR2 } = require('../lib/r2');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const UserGptAssignment = require('../models/UserGptAssignment');
+const User = require('../models/User');
+
 
 // Configure multer for memory storage
 const storage = multer.memoryStorage();
@@ -159,11 +162,10 @@ const getUserCustomGpts = async (req, res) => {
             customGpts 
         });
     } catch (error) {
-        console.error('Error fetching custom GPTs:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Failed to fetch custom GPTs', 
-            error: error.message 
+        console.error('Error fetching user custom GPTs:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching custom GPTs'
         });
     }
 };
@@ -171,6 +173,14 @@ const getUserCustomGpts = async (req, res) => {
 // Get a specific custom GPT by ID
 const getCustomGptById = async (req, res) => {
     try {
+        // Check if id is valid before attempting to find
+        if (!req.params.id || req.params.id === 'undefined') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Invalid GPT ID provided' 
+            });
+        }
+
         const customGpt = await CustomGpt.findById(req.params.id);
         
         if (!customGpt) {
@@ -408,6 +418,252 @@ const deleteKnowledgeFile = async (req, res) => {
     }
 };
 
+// Get all custom GPTs
+const getAllCustomGpts = async (req, res) => {
+  try {
+    const customGpts = await CustomGpt.find();
+    
+    return res.status(200).json({
+      success: true,
+      customGpts
+    });
+  } catch (error) {
+    console.error('Error fetching all custom GPTs:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching custom GPTs'
+    });
+  }
+};
+
+// Get GPTs assigned to a specific user
+const getUserAssignedGpts = async (req, res) => {
+  try {
+    // Get the current user's ID from the authenticated request
+    const userId = req.user._id;
+    
+    // Find all GPT assignments for this user
+
+    
+    // Find assignments and populate with GPT details
+    const assignments = await UserGptAssignment.find({ userId })
+      .populate({
+        path: 'gptId',
+        select: 'name description imageUrl model capabilities knowledgeFiles' // Include fields you want to display
+      });
+    
+    // Extract the GPT data from assignments
+    const assignedGpts = assignments.map(assignment => assignment.gptId);
+    
+    // Return the assigned GPTs
+    return res.status(200).json({
+      success: true,
+      assignedGpts
+    });
+  } catch (error) {
+    console.error('Error fetching user assigned GPTs:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching assigned GPTs'
+    });
+  }
+};
+
+// Assign a GPT to a user
+const assignGptToUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { gptId } = req.body;
+
+    // Verify current user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Only admins can assign GPTs' 
+      });
+    }
+    
+    // Verify user exists
+    const userExists = await User.exists({ _id: userId });
+    if (!userExists) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify GPT exists
+    const gptExists = await CustomGpt.exists({ _id: gptId });
+    if (!gptExists) {
+      return res.status(404).json({
+        success: false,
+        message: 'GPT not found'
+      });
+    }
+
+    // Create the assignment
+    await UserGptAssignment.create({
+      userId,
+      gptId,
+      assignedBy: req.user._id
+    });
+    
+    return res.status(200).json({
+      success: true,
+      message: 'GPT assigned successfully'
+    });
+  } catch (error) {
+    // Handle duplicate key error (GPT already assigned)
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'GPT is already assigned to this user'
+      });
+    }
+    
+    console.error('Error assigning GPT:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error assigning GPT'
+    });
+  }
+};
+
+// Unassign a GPT from a user
+const unassignGptFromUser = async (req, res) => {
+  try {
+    const { userId, gptId } = req.params;
+
+    // Verify current user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Only admins can unassign GPTs' 
+      });
+    }
+    
+    // Find and delete the assignment
+    const result = await UserGptAssignment.findOneAndDelete({ userId, gptId });
+    
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: 'Assignment not found'
+      });
+    }
+    
+    return res.status(200).json({
+      success: true,
+      message: 'GPT unassigned successfully'
+    });
+  } catch (error) {
+    console.error('Error unassigning GPT:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error unassigning GPT'
+    });
+  }
+};
+
+// Get user GPT count for Team Management
+const getUserGptCount = async (req, res) => {
+  try {
+    // Only admins can access this
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized to access user GPT counts' 
+      });
+    }
+
+    // Get all users
+    const users = await User.find().select('_id');
+    
+    // Create a map for user IDs to GPT counts
+    const userGptCounts = {};
+    
+    // Initialize counts to 0 for all users
+    users.forEach(user => {
+      userGptCounts[user._id.toString()] = 0;
+    });
+    
+    // Count assignments for each user
+    const assignments = await UserGptAssignment.aggregate([
+      {
+        $group: {
+          _id: '$userId',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Update counts for users with assignments
+    assignments.forEach(assignment => {
+      userGptCounts[assignment._id.toString()] = assignment.count;
+    });
+    
+    return res.status(200).json({
+      success: true,
+      userGptCounts
+    });
+  } catch (error) {
+    console.error('Error fetching user GPT counts:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching user GPT counts'
+    });
+  }
+};
+
+// Get assigned GPT by ID
+const getAssignedGptById = async (req, res) => {
+  try {
+    const gptId = req.params.id;
+    const userId = req.user._id;
+
+    if (!gptId || gptId === 'undefined') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid GPT ID provided' 
+      });
+    }
+
+    // First, check if this GPT is assigned to the user
+    const assignment = await UserGptAssignment.findOne({ 
+      userId: userId,
+      gptId: gptId
+    });
+
+    if (!assignment) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized to access this GPT or GPT not assigned to user' 
+      });
+    }
+
+    // If assignment exists, get the GPT details
+    const customGpt = await CustomGpt.findById(gptId);
+    
+    if (!customGpt) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Custom GPT not found' 
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      customGpt
+    });
+  } catch (error) {
+    console.error('Error fetching assigned GPT by ID:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching assigned GPT'
+    });
+  }
+};
+
 module.exports = {
     createCustomGpt,
     getUserCustomGpts,
@@ -416,4 +672,10 @@ module.exports = {
     deleteCustomGpt,
     deleteKnowledgeFile,
     uploadMiddleware: handleCombinedUpload,
+    getAllCustomGpts,
+    getUserAssignedGpts,
+    assignGptToUser,
+    unassignGptFromUser,
+    getUserGptCount,
+    getAssignedGptById
 }; 

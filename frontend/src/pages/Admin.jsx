@@ -7,6 +7,8 @@ import CollectionsPage from '../components/Admin/CollectionsPage';
 import CreateCustomGpt from '../components/Admin/CreateCustomGpt';
 import SettingsPage from '../components/Admin/SettingsPage';
 import HistoryPage from '../components/Admin/HistoryPage';
+import UserHistoryPage from '../components/Admin/UserHistoryPage';
+import AdminChat from '../components/Admin/AdminChat';
 
 // Placeholder components for other sections
 const CollectionsComponent = () => <div className="flex-1 p-6"><h1 className="text-2xl font-bold">Collections Page</h1></div>;
@@ -46,6 +48,8 @@ const AdminLayout = () => {
                     <Route path="team" element={<TeamManagement />} />
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="history" element={<HistoryPage />} />
+                    <Route path="history/user/:userId" element={<UserHistoryPage />} />
+                    <Route path="chat/:gptId" element={<AdminChat />} />
                     <Route path="*" element={<AdminDashboard />} />
                 </Routes>
             </div>

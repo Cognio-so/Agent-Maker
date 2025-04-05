@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { IoSendSharp } from 'react-icons/io5';
 import { HiMiniPaperClip } from 'react-icons/hi2';
-import { FiGlobe } from 'react-icons/fi';
 
-const ChatInput = ({ onSubmit, showWebSearchIcon = false }) => {
+const AdminMessageInput = ({ onSubmit, onFileUpload }) => {
     const [inputMessage, setInputMessage] = useState('');
     const textareaRef = useRef(null);
+    const fileInputRef = useRef(null);
 
     // More robust auto-resize textarea
     const resizeTextarea = () => {
@@ -44,6 +44,28 @@ const ChatInput = ({ onSubmit, showWebSearchIcon = false }) => {
         }
     };
 
+    // Function to handle click on the paperclip icon
+    const handleUploadClick = () => {
+        fileInputRef.current.click(); // Trigger click on the hidden file input
+    };
+
+    // Function to handle file selection
+    const handleFileChange = (e) => {
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            console.log("Files selected:", files); 
+            // Pass the files up to the parent component if onFileUpload prop is provided
+            if (onFileUpload) {
+                 onFileUpload(files);
+            }
+            // Example: You could store file info in state to display names, etc.
+            // setSelectedFiles(Array.from(files)); 
+
+            // Reset the input value to allow selecting the same file again if needed
+             e.target.value = null; 
+        }
+    };
+
     return (
         <div className="w-full">
             <form onSubmit={handleSubmit}>
@@ -67,31 +89,34 @@ const ChatInput = ({ onSubmit, showWebSearchIcon = false }) => {
                         
                         {/* Icons below the text area */}
                         <div className="flex justify-between items-center mt-2 sm:mt-3">
-                            {/* Left Icons */}
-                            <div className="flex items-center gap-1">
-                                {/* Conditionally render web search icon */}
-                                {showWebSearchIcon && (
-                                    <div 
-                                        className="text-green-500 rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center"
-                                        title="Web search enabled"
-                                    >
-                                        <FiGlobe size={16} className="sm:text-[18px]" />
-                                    </div>
-                                )}
-                                {/* Upload Icon */}
-                                <button 
-                                    type="button" 
-                                    className="text-gray-400 rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:bg-gray-700/50"
-                                >
-                                    <HiMiniPaperClip size={18} className="sm:text-[20px]" />
-                                </button>
-                            </div>
+                            {/* Hidden File Input */}
+                            <input 
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                style={{ display: 'none' }}
+                            />
+
+                            {/* Upload Icon Button */}
+                            <button 
+                                type="button" 
+                                onClick={handleUploadClick}
+                                className="text-gray-400 rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:bg-gray-700/50 transition-colors"
+                                aria-label="Attach file"
+                            >
+                                <HiMiniPaperClip size={18} className="sm:text-[20px]" />
+                            </button>
                             
-                            {/* Send Icon */}
+                            {/* Send Icon Button */}
                             <button 
                                 type="submit" 
-                                className="bg-gray-700 rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className={`bg-gray-700 rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center transition-colors ${
+                                    !inputMessage.trim() 
+                                    ? 'opacity-50 cursor-not-allowed' 
+                                    : 'hover:bg-gray-600'
+                                }`}
                                 disabled={!inputMessage.trim()}
+                                aria-label="Send message"
                             >
                                 <IoSendSharp size={16} className="sm:text-[18px]" />
                             </button>
@@ -103,4 +128,4 @@ const ChatInput = ({ onSubmit, showWebSearchIcon = false }) => {
     );
 };
 
-export default ChatInput; 
+export default AdminMessageInput; 

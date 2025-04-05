@@ -1,14 +1,16 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const customGptSchema = new Schema({
+const CustomGptSchema = new Schema({
     name: {
         type: String,
         required: true,
+        trim: true
     },
     description: {
         type: String,
         required: true,
+        trim: true
     },
     instructions: {
         type: String,
@@ -16,22 +18,19 @@ const customGptSchema = new Schema({
     },
     conversationStarter: {
         type: String,
-        default: '',
+        default: ""
     },
     model: {
         type: String,
-        enum: ['gpt-4', 'gpt-3.5', 'claude', 'gemini', 'llama'],
-        default: 'gpt-4',
+        default: ""
     },
     capabilities: {
-        webBrowsing: {
-            type: Boolean,
-            default: true,
-        },
+        type: Object,
+        default: { webBrowsing: true }
     },
     imageUrl: {
         type: String,
-        default: null,
+        default: null
     },
     knowledgeFiles: [{
         name: String,
@@ -42,10 +41,18 @@ const customGptSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'User',
         required: true,
+    },
+    isPublic: {
+        type: Boolean,
+        default: false
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
     }
 }, { timestamps: true });
 
 // Add logging to debug Schema registration
-const CustomGpt = mongoose.model('CustomGpt', customGptSchema);
+const CustomGpt = mongoose.model('CustomGpt', CustomGptSchema);
 
 module.exports = CustomGpt; 

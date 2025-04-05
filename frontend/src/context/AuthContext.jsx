@@ -76,12 +76,29 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
+        // 1. Call the new endpoint to mark user as inactive in the DB
+        // We assume the user is logged in if they are calling logout,
+        // so this request should be authenticated.
+        try {
+            await axios.put(`${BASE_URL}/api/auth/me/inactive`, {}, { withCredentials: true });
+        } catch (inactiveErr) {
+            // Log the error, but proceed with logout anyway
+            console.error("Failed to mark user as inactive:", inactiveErr.response?.data?.message || inactiveErr.message);
+        }
+
+        // 2. Call the original logout endpoint to clear the session/cookie
         await axios.post(`${BASE_URL}/api/auth/logout`, {}, { withCredentials: true });
+        
+        // 3. Clear user state and navigate
         setUser(null);
         navigate('/login'); 
     } catch (err) {
+        // Handle errors from the main logout call specifically
         setError(err.response?.data?.message || 'Logout failed');
         console.error("Logout error:", err);
+        // Attempt to clear user state even if backend calls fail partially
+        setUser(null); 
+        navigate('/login');
     } finally {
         setLoading(false);
     }

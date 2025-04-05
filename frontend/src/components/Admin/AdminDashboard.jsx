@@ -28,13 +28,17 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
         education: [],
         entertainment: []
     });
+    const [gptCreated, setGptCreated] = useState(false);
     
     // Fetch agents data from the backend
     useEffect(() => {
         const fetchAgents = async () => {
             try {
                 setLoading(true);
-                const response = await axios.get(`${API_URL}/api/custom-gpts`, { withCredentials: true });
+                console.log("Fetching from:", `${API_URL}/api/custom-gpts`); // Debug log
+                const response = await axios.get(`${API_URL}/api/custom-gpts`, { 
+                    withCredentials: true 
+                });
                 
                 if (response.data.success && response.data.customGpts) {
                     // Sort by creation date (newest first)
@@ -52,6 +56,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                     
                     // Take the 4 most recent for featured
                     categorizedData.featured = sortedGpts.slice(0, 4).map(gpt => ({
+                        id: gpt._id,
                         image: gpt.imageUrl || defaultAgentImage,
                         name: gpt.name,
                         status: Math.random() > 0.5 ? 'online' : 'offline', // Random status for demo
@@ -64,6 +69,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                     sortedGpts.forEach(gpt => {
                         const text = (gpt.description + ' ' + gpt.name).toLowerCase();
                         const agent = {
+                            id: gpt._id,
                             image: gpt.imageUrl || defaultAgentImage,
                             name: gpt.name,
                             status: Math.random() > 0.5 ? 'online' : 'offline',
@@ -95,6 +101,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                 }
             } catch (err) {
                 console.error("Error fetching agents:", err);
+                console.log("Full error details:", err.response?.data || err.message); // More detailed logging
                 setError("Failed to load agents data");
             } finally {
                 setLoading(false);
@@ -102,7 +109,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
         };
         
         fetchAgents();
-    }, []);
+    }, [gptCreated]);
     
     // Handle window resize
     useEffect(() => {
@@ -305,6 +312,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                                 {filteredAgentsData.featured.map((agent, index) => (
                                                     <AgentCard
                                                         key={index}
+                                                        agentId={agent.id}
                                                         agentImage={agent.image}
                                                         agentName={agent.name}
                                                         status={agent.status}
@@ -374,7 +382,13 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                     </>
                 ) : (
                     <div className="h-full">
-                        <CreateCustomGpt onGoBack={() => setShowCreateGpt(false)} />
+                        <CreateCustomGpt 
+                            onGoBack={() => setShowCreateGpt(false)} 
+                            onGptCreated={() => {
+                                setGptCreated(prev => !prev);
+                                setShowCreateGpt(false);
+                            }}
+                        />
                     </div>
                 )}
             </div>

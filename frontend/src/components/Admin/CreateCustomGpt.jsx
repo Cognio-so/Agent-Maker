@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api';
 
-const CreateCustomGpt = ({ onGoBack, editGptId = null }) => {
+const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
     const navigate = useNavigate();
 
     // State for GPT Configuration
@@ -261,6 +261,15 @@ const CreateCustomGpt = ({ onGoBack, editGptId = null }) => {
             } catch (navError) {
                 console.error("Error in onGoBack:", navError);
                 navigate('/admin'); // Fallback to direct navigation
+            }
+            
+            // After successful creation
+            if (response.data.success) {
+                toast.success('GPT created successfully!');
+                // Call the callback to refresh parent component
+                if (onGptCreated) {
+                    onGptCreated();
+                }
             }
             
         } catch (error) {

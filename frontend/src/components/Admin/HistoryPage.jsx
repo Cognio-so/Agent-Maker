@@ -6,22 +6,26 @@ import {
   IoSearchOutline,
   IoFilterOutline,
   IoChevronDown,
-  IoEllipse
+  IoEllipse,
+  IoArrowBack
 } from 'react-icons/io5';
 import axios from 'axios';
+import { useNavigate, useLocation } from 'react-router-dom';
+
+// Import team member data
+import { teamMembers } from './teamData';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
-// Helper function to get initials
-const getInitials = (name) => {
-  if (!name) return '?';
-  const names = name.split(' ');
-  if (names.length === 1) return names[0].charAt(0).toUpperCase();
-  return (names[0].charAt(0) + (names.length > 1 ? names[names.length - 1].charAt(0) : '')).toUpperCase(); // Handle single names better
-};
-
 const HistoryPage = () => {
-  const [viewType, setViewType] = useState('personal'); // 'personal' or 'team'
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Initialize view type from URL parameter or default to 'personal'
+  const queryParams = new URLSearchParams(location.search);
+  const initialView = queryParams.get('view') || 'personal';
+  
+  const [viewType, setViewType] = useState(initialView);
   const [isLoading, setIsLoading] = useState(false);
   const [activities, setActivities] = useState([]);
   const [filteredActivities, setFilteredActivities] = useState([]);
@@ -34,27 +38,17 @@ const HistoryPage = () => {
       delete: true,
       settings: true,
     },
-    dateRange: 'all', // 'today', 'week', 'month', 'all'
+    dateRange: 'all',
   });
   
-  const filterDropdownRef = useRef(null); // Ref for the filter dropdown
+  const filterDropdownRef = useRef(null);
 
-  // Mock data - replace with actual API call
   useEffect(() => {
     const fetchActivityData = async () => {
       setIsLoading(true);
       try {
-        // Simulate API response with mock data
         setTimeout(() => {
-          const mockData = generateMockData(viewType).map(activity => ({
-              ...activity,
-              // Ensure user object and avatar property exist
-              user: { 
-                  id: activity.user?.id || null, 
-                  name: activity.user?.name || 'Unknown User', 
-                  avatar: activity.user?.avatar || null 
-              } 
-          }));
+          const mockData = generateMockData(viewType);
           setActivities(mockData);
           setFilteredActivities(mockData);
           setIsLoading(false);
@@ -115,10 +109,7 @@ const HistoryPage = () => {
     return 'edit'; // Default
   };
 
-  // Helper to get the icon for an activity
-  // const getActivityIcon = (action) => { ... } // We can keep or remove this
-
-  // Generate random mock data
+  // Generate random mock data using actual team member data
   const generateMockData = (type) => {
     const actions = [
       'Created new custom GPT',
@@ -131,14 +122,25 @@ const HistoryPage = () => {
       'Updated profile information'
     ];
     
-    const users = type === 'personal' 
-      ? [{ id: 1, name: 'You', avatar: null }]
-      : [
-          { id: 1, name: 'You', avatar: null },
-          { id: 2, name: 'Alex Johnson', avatar: null },
-          { id: 3, name: 'Sarah Wilson', avatar: null },
-          { id: 4, name: 'Michael Brown', avatar: null }
-        ];
+    let users = [];
+    
+    if (type === 'personal') {
+      users = [{ id: '1', name: 'You', email: 'you@gptnexus.com', avatar: null }];
+    } else {
+      // Filter out admin users from team view
+      users = teamMembers
+        .filter(member => member.role !== 'Admin')
+        .map(member => ({
+          id: member.id.toString(),
+          name: member.name,
+          email: member.email,
+          avatar: null,
+          department: member.department,
+          position: member.position,
+          role: member.role,
+          status: member.status
+        }));
+    }
     
     const gptNames = [
       'Research Assistant',
@@ -152,7 +154,7 @@ const HistoryPage = () => {
     const mockData = [];
     
     // Generate some random activities
-    for (let i = 0; i < 25; i++) { // Increased count for better demo
+    for (let i = 0; i < 25; i++) {
       const userIndex = type === 'personal' ? 0 : Math.floor(Math.random() * users.length);
       const actionIndex = Math.floor(Math.random() * actions.length);
       const action = actions[actionIndex];
@@ -171,7 +173,7 @@ const HistoryPage = () => {
       
       // Generate a random date within the last 45 days
       const now = new Date();
-      const daysAgo = Math.floor(Math.random() * 45); // Wider date range
+      const daysAgo = Math.floor(Math.random() * 45);
       const hoursAgo = Math.floor(Math.random() * 24);
       const minutesAgo = Math.floor(Math.random() * 60);
       const timestamp = new Date(now);
@@ -198,22 +200,29 @@ const HistoryPage = () => {
     const now = new Date();
     const diffTime = Math.abs(now - date);
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
     
-    const fullDateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const fullDateString = date.toLocaleDateString(undefined, fullDateOptions);
-    const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    let relativeString = '';
-    if (diffDays === 0 && date.getDate() === now.getDate()) {
-      relativeString = `Today`;
-    } else if (diffDays === 0 || (diffDays === 1 && date.getDate() !== now.getDate())) {
-       relativeString = `Yesterday`;
+    // Simplified timestamp format
+    if (diffDays === 0) {
+      if (diffHours < 1) {
+        return 'Just now';
+      } else if (diffHours < 2) {
+        return '1 hour ago';
+      } else if (diffHours < 24) {
+        return `${diffHours} hours ago`;
+      }
+      return 'Today';
+    } else if (diffDays === 1) {
+      return 'Yesterday';
     } else if (diffDays < 7) {
-       relativeString = `${diffDays} days ago`;
-    } 
-    
-    // Combine full date, relative time (if applicable), and exact time
-    return `${fullDateString} ${relativeString ? `(${relativeString})` : ''} at ${timeString}`;
+      return `${diffDays} days ago`;
+    } else {
+      return date.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
   };
 
   // Toggle filter options
@@ -247,18 +256,39 @@ const HistoryPage = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [filterDropdownRef]);
 
+  // When view type changes, update URL
+  useEffect(() => {
+    // Update URL when view type changes without navigating
+    const newUrl = `/admin/history?view=${viewType}`;
+    window.history.replaceState(null, '', newUrl);
+  }, [viewType]);
+
+  // CSS for hiding scrollbars
+  const scrollbarHideStyles = `
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .hide-scrollbar {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+    }
+  `;
+
   return (
     <div className="flex flex-col h-full bg-black text-gray-100 overflow-hidden">
-      {/* Header section - Added responsive text alignment */}
-      <div className="px-6 pt-6 pb-5 flex-shrink-0 border-b border-gray-800 text-center sm:text-left">
+      {/* Add hidden scrollbar styles */}
+      <style>{scrollbarHideStyles}</style>
+      
+      {/* Header section */}
+      <div className="px-6 pt-6 pb-5 flex-shrink-0 border-b border-gray-800">
         <h1 className="text-2xl font-semibold text-white">Activity History</h1>
         <p className="text-sm text-gray-400 mt-1">Track actions and changes across your workspace</p>
       </div>
       
-      {/* Controls section - Improved spacing and clearer components */}
+      {/* Controls section */}
       <div className="px-6 py-4 flex-shrink-0 border-b border-gray-800">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          {/* View switcher - More subtle styling */}
+          {/* View switcher */}
           <div className="inline-flex items-center p-1 rounded-lg bg-gray-900 border border-gray-700 self-center sm:self-start">
             <button
               onClick={() => setViewType('personal')}
@@ -299,7 +329,7 @@ const HistoryPage = () => {
               />
             </div>
             
-            <div className="relative" ref={filterDropdownRef}> {/* Added ref here */}
+            <div className="relative" ref={filterDropdownRef}>
               <button
                 onClick={() => setFilterOpen(!filterOpen)}
                 className="flex items-center px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:border-gray-600 transition-colors"
@@ -309,7 +339,7 @@ const HistoryPage = () => {
                 <IoChevronDown size={14} className={`ml-1 transition-transform ${filterOpen ? 'rotate-180' : ''}`} />
               </button>
               
-              {/* Filter Dropdown - Darker, clearer separation */}
+              {/* Filter Dropdown */}
               {filterOpen && (
                 <div className="absolute right-0 mt-2 w-60 rounded-lg bg-gray-900 border border-gray-700 shadow-2xl z-20 p-4">
                   <div className="mb-4">
@@ -319,7 +349,7 @@ const HistoryPage = () => {
                         <label key={type} className="flex items-center text-sm">
                           <input
                             type="checkbox"
-                            className="form-checkbox h-4 w-4 rounded bg-gray-700 border-gray-600 text-gray-300 focus:ring-gray-500 focus:ring-offset-gray-900"
+                            className="form-checkbox h-4 w-4 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900"
                             checked={filterOptions.actionTypes[type]}
                             onChange={(e) => toggleFilterOption(type, e.target.checked)}
                           />
@@ -337,7 +367,7 @@ const HistoryPage = () => {
                           key={range}
                           className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
                             filterOptions.dateRange === range
-                              ? 'bg-gray-600 text-white'
+                              ? 'bg-blue-600 text-white'
                               : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
                           }`}
                           onClick={() => setDateRangeFilter(range)}
@@ -354,11 +384,11 @@ const HistoryPage = () => {
         </div>
       </div>
       
-      {/* Timeline content - Added flex justify-center to center the child container */}
-      <div className="flex-1 overflow-y-auto py-6 px-4 flex justify-center [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"> {/* Changed px-2 to px-4, added flex justify-center */}
+      {/* Timeline content - add hide-scrollbar class */}
+      <div className="flex-1 overflow-y-auto py-6 px-4 flex justify-center hide-scrollbar">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="rounded-full h-10 w-10 border-t-2 border-b-2 border-gray-500 animate-spin"></div>
+            <div className="rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500 animate-spin"></div>
           </div>
         ) : filteredActivities.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 px-4">
@@ -374,36 +404,46 @@ const HistoryPage = () => {
             </p>
           </div>
         ) : (
-           // Wrapped the list in a container with max-width and w-full
-          <div className="w-full max-w-4xl"> {/* Container for centering */}
-            <div className="space-y-1 relative border-l border-gray-800 ml-4"> {/* List container */}
-                {filteredActivities.map((activity, index) => (
-                    <div 
-                        key={activity.id} 
-                        className="relative group flex items-start justify-between gap-4 py-3 pr-4 pl-8 transition-colors hover:bg-gray-900/50 rounded-r-lg" // Reverted pr-2 to pr-4
-                    >
-                        {/* Timeline marker dot */}
-                        <div className="absolute -left-[10.5px] top-[18px] flex items-center justify-center w-5 h-5 rounded-full bg-gray-800 border-2 border-gray-600 group-hover:border-gray-400 transition-colors z-10">
-                            <IoEllipse size={6} className="text-gray-500 group-hover:text-gray-300"/> 
+          <div className="w-full max-w-4xl">
+            <div className="space-y-3 relative border-l border-gray-800 ml-4">
+              {filteredActivities.map((activity) => (
+                <div 
+                  key={activity.id} 
+                  className="relative bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-lg p-4 ml-4 transition-colors"
+                >
+                  {/* Timeline marker dot */}
+                  <div className="absolute -left-[10px] top-[50%] transform -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-gray-700 border-2 border-gray-600">
+                    <IoEllipse size={6} className="text-gray-400"/> 
+                  </div>
+                  
+                  {/* Activity content */}
+                  <div className="flex justify-between items-start gap-4">
+                    <div>
+                      {viewType === 'team' && (
+                        <div className="mb-1.5 flex items-center">
+                          <span 
+                            className="font-semibold text-white cursor-pointer hover:underline"
+                            onClick={() => navigate(`/admin/history/user/${activity.user.id}?view=${viewType}`)}
+                          >
+                            {activity.user.name}
+                          </span>
                         </div>
-                        
-                        {/* Left Content (Activity Description) */}
-                        <div className="flex-1 min-w-0 mr-4"> {/* Added margin-right */}
-                            <p className="text-sm text-gray-200 flex flex-wrap gap-x-1.5 items-baseline"> {/* Use baseline align */}
-                                {viewType === 'team' && (
-                                    <span className="font-semibold text-white mr-1">{activity.user.name}</span>
-                                )}
-                                <span className="text-gray-400">{activity.action}</span> 
-                                <span className="font-medium text-gray-100">{activity.details}</span>
-                            </p>
-                        </div>
-                        
-                        {/* Right Content (Timestamp) */}
-                        <div className="flex-shrink-0 text-right text-xs text-gray-500 whitespace-nowrap">
-                            <div>{formatTimestamp(activity.timestamp)}</div>
-                        </div>
+                      )}
+                      
+                      <p className="text-sm">
+                        <span className="text-gray-300">{activity.action}</span>
+                        {activity.details && (
+                          <> <span className="font-medium text-white">{activity.details}</span></>
+                        )}
+                      </p>
                     </div>
-                ))}
+                    
+                    <div className="text-xs text-gray-500 whitespace-nowrap">
+                      {formatTimestamp(activity.timestamp)}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -412,4 +452,4 @@ const HistoryPage = () => {
   );
 };
 
-export default HistoryPage; 
+export default HistoryPage;

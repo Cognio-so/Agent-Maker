@@ -192,7 +192,7 @@ const CollectionsPage = () => {
                 </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto pb-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                 {error ? (
                     <div className="flex flex-col items-center justify-center h-full text-red-400">
                         <p className="text-lg mb-4">{error}</p>
@@ -219,7 +219,11 @@ const CollectionsPage = () => {
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {filteredGpts.map((gpt) => (
-                            <div key={gpt._id} className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-gray-600 transition-all shadow-lg hover:shadow-xl flex flex-col">
+                            <div 
+                                key={gpt._id} 
+                                className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-gray-600 transition-all shadow-lg hover:shadow-xl flex flex-col cursor-pointer"
+                                onClick={() => navigate(`/admin/chat/${gpt._id}`)}
+                            >
                                 <div className="h-24 sm:h-32 bg-gradient-to-br from-gray-700 to-gray-900 relative flex-shrink-0">
                                     {gpt.imageUrl ? (
                                         <img 
@@ -235,14 +239,20 @@ const CollectionsPage = () => {
                                     
                                     <div className="absolute top-2 right-2 flex gap-1.5">
                                         <button 
-                                            onClick={() => handleEdit(gpt._id)}
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // Prevent navigating to chat
+                                                handleEdit(gpt._id);
+                                            }}
                                             className="p-1.5 sm:p-2 bg-gray-900/70 rounded-full hover:bg-blue-700/80 transition-colors"
                                             title="Edit GPT"
                                         >
                                             <FiEdit size={14} />
                                         </button>
                                         <button 
-                                            onClick={() => handleDelete(gpt._id)}
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // Prevent navigating to chat
+                                                handleDelete(gpt._id);
+                                            }}
                                             className="p-1.5 sm:p-2 bg-gray-900/70 rounded-full hover:bg-red-700/80 transition-colors"
                                             title="Delete GPT"
                                         >

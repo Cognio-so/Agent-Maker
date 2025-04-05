@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   IoGridOutline, 
   IoFolderOpenOutline, 
@@ -7,18 +7,42 @@ import {
   IoExitOutline,
   IoChevronBackOutline,
   IoChevronForwardOutline,
-  IoMenuOutline
+  IoMenuOutline,
+  IoSettingsOutline
 } from 'react-icons/io5';
 import { useAuth } from '../../context/AuthContext';
+import axios from 'axios';
+
+const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
-  const [isCollapsed, setIsCollapsed] = React.useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
-  const [activeItem, setActiveItem] = React.useState(activePage);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeItem, setActiveItem] = useState(activePage);
+  const [assignedGptsCount, setAssignedGptsCount] = useState(0);
   const { logout } = useAuth();
   
+  // Fetch assigned GPTs count
+  useEffect(() => {
+    const fetchAssignedGpts = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/custom-gpts/user/assigned`, {
+          withCredentials: true
+        });
+        
+        if (response.data.success && response.data.assignedGpts) {
+          setAssignedGptsCount(response.data.assignedGpts.length);
+        }
+      } catch (error) {
+        console.error("Error fetching assigned GPTs:", error);
+      }
+    };
+    
+    fetchAssignedGpts();
+  }, []);
+  
   // Auto-collapse on small screens
-  React.useEffect(() => {
+  useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 768) {
         setIsCollapsed(true);
@@ -61,9 +85,14 @@ const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <IoGridOutline size={20} /> },
-    { id: 'collections', label: 'Collections', icon: <IoFolderOpenOutline size={20} /> },
+    { 
+      id: 'collections', 
+      label: 'Collections', 
+      icon: <IoFolderOpenOutline size={20} />
+    },
     { id: 'favourites', label: 'Favourites', icon: <IoHeartOutline size={20} /> },
     { id: 'history', label: 'History', icon: <IoTimeOutline size={20} /> },
+    { id: 'settings', label: 'Settings', icon: <IoSettingsOutline size={20} /> },
   ];
 
   return (
@@ -120,7 +149,11 @@ const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
                 title={isCollapsed ? item.label : ''}
               >
                 <span className="flex items-center justify-center">{item.icon}</span>
-                {!isCollapsed && <span className="ml-3">{item.label}</span>}
+                {!isCollapsed && (
+                  <div className="flex items-center justify-between w-full">
+                    <span className="ml-3">{item.label}</span>
+                  </div>
+                )}
               </button>
             ))}
           </div>

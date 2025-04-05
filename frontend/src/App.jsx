@@ -1,10 +1,57 @@
 import React, { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import SignupPage from './pages/SignupPage'
 import LoginPage from './pages/LoginPage'
 import UserPage from './pages/UserPage'
 import Homepage from './pages/Homepage'
 import Admin from './pages/Admin'
+import { useAuth } from './context/AuthContext'
+
+// ProtectedRoute component for user-level authentication
+const ProtectedRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-black text-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    // Redirect to login page and save the attempted URL for redirect after login
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  
+  return children;
+};
+
+// AdminRoute component for admin-level authentication
+const AdminRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-black text-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  
+  if (user.role !== 'admin') {
+    // If user is not an admin, redirect to user page
+    return <Navigate to="/user" replace />;
+  }
+  
+  return children;
+};
 
 function App() {
   useEffect(() => {
@@ -27,14 +74,44 @@ function App() {
     };
   }, []);
 
+  const { user } = useAuth();
+
   return (
-        <Routes>
-          <Route path="/" element={<Homepage/>} />
-          <Route path="/user" element={<UserPage/>} />
-          <Route path="/admin/*" element={<Admin />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-        </Routes>
+    <Routes>
+      {/* Public routes */}
+      <Route path="/" element={<Homepage />} />
+      <Route path="/login" element={
+        user ? (
+          <Navigate to={user.role === 'admin' ? '/admin' : '/user'} replace />
+        ) : (
+          <LoginPage />
+        )
+      } />
+      <Route path="/signup" element={
+        user ? (
+          <Navigate to={user.role === 'admin' ? '/admin' : '/user'} replace />
+        ) : (
+          <SignupPage />
+        )
+      } />
+
+      {/* Protected user route */}
+      <Route path="/user" element={
+        <ProtectedRoute>
+          <UserPage />
+        </ProtectedRoute>
+      } />
+
+      {/* Protected admin routes */}
+      <Route path="/admin/*" element={
+        <AdminRoute>
+          <Admin />
+        </AdminRoute>
+      } />
+
+      {/* Fallback route for any other path */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
 import {
     IoGridOutline,
     IoFolderOpenOutline,
@@ -13,34 +13,20 @@ import {
     IoMenuOutline
 } from 'react-icons/io5';
 
-// API URL from environment variables
-
 const AdminSidebar = ({ activePage = 'dashboard', onNavigate }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [activeItem, setActiveItem] = useState(activePage);
     const navigate = useNavigate();
+    const { logout } = useAuth();
 
-    // Update activeItem when activePage prop changes
     useEffect(() => {
         setActiveItem(activePage);
     }, [activePage]);
 
-    const handleLogout = () => {
-        // Show confirmation dialog
+    const handleLogout = async () => {
         if (window.confirm("Are you sure you want to logout?")) {
-            // Clear user authentication data
-            localStorage.removeItem("authToken");
-            localStorage.removeItem("userData");
-            sessionStorage.removeItem("adminSession");
-            
-            // You might need to update any global auth state here
-            // For example: dispatch(logoutUser());
-            
-            // Redirect to login page
-            navigate("/login");
-            
-            console.log("User successfully logged out");
+            await logout();
         }
     };
 
