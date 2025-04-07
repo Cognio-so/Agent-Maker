@@ -3,7 +3,7 @@ import { IoSendSharp } from 'react-icons/io5';
 import { HiMiniPaperClip } from 'react-icons/hi2';
 import { FiGlobe } from 'react-icons/fi';
 
-const ChatInput = ({ onSubmit, showWebSearchIcon = false }) => {
+const ChatInput = ({ onSubmit, isLoading, isDarkMode, showWebSearch }) => {
     const [inputMessage, setInputMessage] = useState('');
     const textareaRef = useRef(null);
 
@@ -13,8 +13,10 @@ const ChatInput = ({ onSubmit, showWebSearchIcon = false }) => {
             // Reset height to get accurate scrollHeight
             textareaRef.current.style.height = '0px';
             const scrollHeight = textareaRef.current.scrollHeight;
-            // Apply minimum height for small content
-            textareaRef.current.style.height = Math.max(40, scrollHeight) + 'px';
+            // Apply minimum height (40px) and max height (e.g., 120px or 200px)
+            const minHeight = 40;
+            const maxHeight = window.innerWidth < 640 ? 120 : 200; // Example responsive max-height
+            textareaRef.current.style.height = Math.min(maxHeight, Math.max(minHeight, scrollHeight)) + 'px';
         }
     };
 
@@ -26,12 +28,14 @@ const ChatInput = ({ onSubmit, showWebSearchIcon = false }) => {
     // Also resize on window resize
     useEffect(() => {
         window.addEventListener('resize', resizeTextarea);
+        // Initial resize
+        resizeTextarea();
         return () => window.removeEventListener('resize', resizeTextarea);
     }, []);
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (inputMessage.trim()) {
+        if (inputMessage.trim() && !isLoading) { // Don't submit if loading
             onSubmit(inputMessage);
             setInputMessage('');
             
@@ -47,13 +51,18 @@ const ChatInput = ({ onSubmit, showWebSearchIcon = false }) => {
     return (
         <div className="w-full">
             <form onSubmit={handleSubmit}>
-                <div className="bg-[#1e1e1e] rounded-2xl sm:rounded-3xl shadow-md">
-                    <div className="flex flex-col px-3 sm:px-4 py-3 sm:py-4 rounded-2xl sm:rounded-3xl border border-gray-700/50">
-                        {/* Textarea field that grows with content */}
+                <div className={`rounded-2xl sm:rounded-3xl shadow-md ${
+                    isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'
+                }`}>
+                    <div className={`flex flex-col px-3 sm:px-4 py-2 sm:py-3 rounded-2xl sm:rounded-3xl border ${
+                        isDarkMode ? 'border-gray-700/50' : 'border-gray-200'
+                    }`}>
                         <textarea
                             ref={textareaRef}
-                            className="w-full bg-transparent border-0 outline-none text-white resize-none overflow-hidden min-h-[40px] max-h-[120px] sm:max-h-[200px] text-sm sm:text-base" 
-                            placeholder="Ask anything ..."
+                            className={`w-full bg-transparent border-0 outline-none resize-none overflow-y-auto min-h-[40px] text-sm sm:text-base no-scrollbar ${
+                                isDarkMode ? 'text-white placeholder-gray-500' : 'text-gray-900 placeholder-gray-400'
+                            }`} 
+                            placeholder="Ask anything..."
                             value={inputMessage}
                             onChange={(e) => setInputMessage(e.target.value)}
                             rows={1}
@@ -63,35 +72,43 @@ const ChatInput = ({ onSubmit, showWebSearchIcon = false }) => {
                                     handleSubmit(e);
                                 }
                             }}
+                            disabled={isLoading}
+                            style={{ maxHeight: window.innerWidth < 640 ? '120px' : '200px' }}
                         />
                         
-                        {/* Icons below the text area */}
-                        <div className="flex justify-between items-center mt-2 sm:mt-3">
-                            {/* Left Icons */}
+                        <div className="flex justify-between items-center mt-1 sm:mt-2">
                             <div className="flex items-center gap-1">
-                                {/* Conditionally render web search icon */}
-                                {showWebSearchIcon && (
+                                {showWebSearch && (
                                     <div 
-                                        className="text-green-500 rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center"
+                                        className={`rounded-full w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center ${
+                                            isDarkMode ? 'text-green-500' : 'text-green-600'
+                                        }`}
                                         title="Web search enabled"
                                     >
                                         <FiGlobe size={16} className="sm:text-[18px]" />
                                     </div>
                                 )}
-                                {/* Upload Icon */}
                                 <button 
                                     type="button" 
-                                    className="text-gray-400 rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:bg-gray-700/50"
+                                    className={`rounded-full w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center transition-colors ${
+                                        isDarkMode 
+                                            ? 'text-gray-400 hover:bg-gray-700/50' 
+                                            : 'text-gray-500 hover:bg-gray-200'
+                                    }`}
+                                    disabled={isLoading}
                                 >
                                     <HiMiniPaperClip size={18} className="sm:text-[20px]" />
                                 </button>
                             </div>
                             
-                            {/* Send Icon */}
                             <button 
                                 type="submit" 
-                                className="bg-gray-700 rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={!inputMessage.trim()}
+                                className={`rounded-full w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center transition-colors ${
+                                    isDarkMode 
+                                        ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+                                        : 'bg-blue-500 hover:bg-blue-600 text-white'
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                disabled={!inputMessage.trim() || isLoading}
                             >
                                 <IoSendSharp size={16} className="sm:text-[18px]" />
                             </button>

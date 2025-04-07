@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { FiSearch, FiMessageSquare, FiClock, FiCalendar, FiTrash2 } from 'react-icons/fi';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import { FiSearch, FiMessageSquare, FiClock, FiCalendar, FiTrash2, FiXCircle } from 'react-icons/fi';
 import { IoEllipse } from 'react-icons/io5';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../../context/ThemeContext';
 
 // Mock data moved outside component to prevent recreation on each render
 const mockConversations = [
@@ -57,6 +58,47 @@ const mockConversations = [
     }
 ];
 
+// Memoized Conversation Item Component
+const ConversationItem = memo(({ conv, formatTimestamp, onContinue, onDelete, isDarkMode }) => (
+    <div 
+        className={`p-4 rounded-lg border mb-3 cursor-pointer transition-all group ${
+            isDarkMode 
+                ? 'bg-gray-800 border-gray-700 hover:bg-gray-700/70 hover:border-gray-600' 
+                : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+        }`}
+        onClick={() => onContinue(conv)}
+    >
+        <div className="flex items-center justify-between mb-2">
+            <h3 className={`font-semibold truncate mr-4 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{conv.gptName}</h3>
+            <span className={`text-xs flex-shrink-0 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                {formatTimestamp(conv.timestamp)}
+            </span>
+        </div>
+        <p className={`text-sm line-clamp-2 mb-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+            <span className={isDarkMode ? 'text-gray-500' : 'text-gray-400'}>Last:</span> {conv.lastMessage}
+        </p>
+        <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-3">
+                <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>{conv.messageCount} messages</span>
+                <span className={`px-1.5 py-0.5 rounded ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-200 text-gray-600'}`}>
+                    {conv.model}
+                </span>
+            </div>
+            <button 
+                onClick={(e) => onDelete(conv, e)}
+                className={`p-1 rounded-full opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${
+                    isDarkMode 
+                        ? 'text-red-400 hover:bg-red-900/30' 
+                        : 'text-red-500 hover:bg-red-100'
+                }`}
+                title="Delete conversation"
+            >
+                <FiTrash2 size={16} />
+            </button>
+        </div>
+    </div>
+));
+
 const HistoryPage = () => {
     const [conversations, setConversations] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -66,17 +108,19 @@ const HistoryPage = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [selectedConversation, setSelectedConversation] = useState(null);
     const navigate = useNavigate();
+    const { isDarkMode } = useTheme();
     
     useEffect(() => {
         const fetchConversationHistory = async () => {
             try {
                 setLoading(true);
-                // Removed artificial timeout delay - load data immediately
+                setError(null);
+                await new Promise(resolve => setTimeout(resolve, 500)); 
                 setConversations(mockConversations);
-                setLoading(false);
             } catch (error) {
                 console.error("Error fetching conversation history:", error);
                 setError("Failed to load your conversation history");
+            } finally {
                 setLoading(false);
             }
         };
@@ -84,66 +128,55 @@ const HistoryPage = () => {
         fetchConversationHistory();
     }, []);
     
-    // Memoized filtered conversations based on search and time period
     const filteredConversations = useMemo(() => {
         let filtered = [...conversations];
         
-        // Apply search filter
         if (searchTerm) {
+            const lowerSearchTerm = searchTerm.toLowerCase();
             filtered = filtered.filter(conv => 
-                conv.gptName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                conv.lastMessage.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                conv.summary.toLowerCase().includes(searchTerm.toLowerCase())
+                conv.gptName.toLowerCase().includes(lowerSearchTerm) ||
+                conv.lastMessage.toLowerCase().includes(lowerSearchTerm) ||
+                (conv.summary && conv.summary.toLowerCase().includes(lowerSearchTerm))
             );
         }
         
-        // Apply time period filter
         if (filterPeriod !== 'all') {
             const now = new Date();
             let cutoffDate;
-            
             switch (filterPeriod) {
-                case 'today':
-                    cutoffDate = new Date(now.setHours(0, 0, 0, 0));
-                    break;
-                case 'week':
-                    cutoffDate = new Date(now.setDate(now.getDate() - 7));
-                    break;
-                case 'month':
-                    cutoffDate = new Date(now.setMonth(now.getMonth() - 1));
-                    break;
-                default:
-                    cutoffDate = null;
+                case 'today': cutoffDate = new Date(now.setHours(0, 0, 0, 0)); break;
+                case 'week': cutoffDate = new Date(now.setDate(now.getDate() - 7)); break;
+                case 'month': cutoffDate = new Date(now.setMonth(now.getMonth() - 1)); break;
+                default: cutoffDate = null;
             }
-            
             if (cutoffDate) {
                 filtered = filtered.filter(conv => new Date(conv.timestamp) >= cutoffDate);
             }
         }
         
-        return filtered;
+        return filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     }, [conversations, searchTerm, filterPeriod]);
     
     const formatTimestamp = useCallback((timestamp) => {
-        const date = new Date(timestamp);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        
-        if (diffDays === 0) {
-            // Today - show time
-            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } else if (diffDays === 1) {
-            return 'Yesterday';
-        } else if (diffDays < 7) {
-            return `${diffDays} days ago`;
-        } else {
+        try {
+            const date = new Date(timestamp);
+            if (isNaN(date)) return 'Invalid Date';
+            const now = new Date();
+            const diffMs = now - date;
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            if (diffDays === 1) return 'Yesterday';
+            if (diffDays < 7) return `${diffDays} days ago`;
             return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        } catch (e) {
+            console.error("Error formatting timestamp:", timestamp, e);
+            return 'Unknown Date';
         }
     }, []);
     
     const handleContinueConversation = useCallback((conv) => {
-        navigate(`/user?gptId=${conv.gptId}&conversationId=${conv.id}`);
+        navigate(`/user/chat?gptId=${conv.gptId}`);
     }, [navigate]);
     
     const confirmDeleteConversation = useCallback((conv, e) => {
@@ -154,7 +187,6 @@ const HistoryPage = () => {
     
     const handleDeleteConversation = useCallback(() => {
         if (!selectedConversation) return;
-        
         setConversations(prev => prev.filter(c => c.id !== selectedConversation.id));
         setShowDeleteConfirm(false);
         setSelectedConversation(null);
@@ -165,48 +197,59 @@ const HistoryPage = () => {
         setSelectedConversation(null);
     }, []);
     
-    const handleSearchChange = useCallback((e) => {
-        setSearchTerm(e.target.value);
+    const handleSearchChange = useCallback((e) => setSearchTerm(e.target.value), []);
+    const handleFilterChange = useCallback((e) => setFilterPeriod(e.target.value), []);
+
+    const handleRetry = useCallback(() => {
+        window.location.reload();
     }, []);
-    
-    const handleFilterChange = useCallback((e) => {
-        setFilterPeriod(e.target.value);
-    }, []);
-    
-    // Loading indicator with reduced complexity
-    if (loading && conversations.length === 0) {
+
+    if (loading && conversations.length === 0 && !error) {
         return (
-            <div className="flex items-center justify-center h-full text-white">
-                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+            <div className={`flex items-center justify-center h-full ${isDarkMode ? 'bg-black text-white' : 'bg-gray-50 text-gray-700'}`}>
+                <div className={`animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 ${isDarkMode ? 'border-blue-500' : 'border-blue-600'}`}></div>
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col h-full bg-black text-white p-4 sm:p-6 overflow-hidden">
+        <div className={`flex flex-col h-full p-4 sm:p-6 overflow-hidden transition-colors duration-300 ${
+            isDarkMode ? 'bg-black text-white' : 'bg-gray-50 text-gray-900'
+        }`}>
             <div className="mb-5 flex-shrink-0 text-center md:text-left">
                 <h1 className="text-xl sm:text-2xl font-bold">Conversation History</h1>
-                <p className="text-gray-400 text-sm mt-1">View and continue your previous conversations</p>
+                <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    View and continue your previous conversations
+                </p>
             </div>
             
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4 flex-shrink-0">
                 <div className="relative w-full sm:w-auto sm:flex-1 max-w-lg">
-                    <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <FiSearch className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
                     <input
                         type="text"
-                        placeholder="Search conversations..."
+                        placeholder="Search conversations (name, message, summary)..."
                         value={searchTerm}
                         onChange={handleSearchChange}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-gray-700 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        className={`w-full pl-10 pr-4 py-2.5 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base ${
+                            isDarkMode 
+                                ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                                : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                        }`}
                     />
                 </div>
                 
                 <div className="flex items-center gap-2 self-end sm:self-center">
-                    <FiCalendar className="text-gray-400" size={18} />
+                    <FiCalendar className={isDarkMode ? 'text-gray-400' : 'text-gray-500'} size={18} />
                     <select
                         value={filterPeriod}
                         onChange={handleFilterChange}
-                        className="bg-gray-700 border border-gray-600 text-white rounded-lg py-2 px-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        className={`border rounded-lg py-2 px-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base appearance-none pr-8 ${
+                            isDarkMode 
+                                ? 'bg-gray-700 border-gray-600 text-white' 
+                                : 'bg-white border-gray-300 text-gray-900'
+                        }`}
+                        style={{ backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="${isDarkMode ? 'white' : 'black'}" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>')`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5em 1.5em' }}
                     >
                         <option value="all">All Time</option>
                         <option value="today">Today</option>
@@ -216,115 +259,82 @@ const HistoryPage = () => {
                 </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex-1 overflow-y-auto no-scrollbar">
                 {error ? (
-                    <div className="flex flex-col items-center justify-center h-full text-red-400">
+                    <div className={`flex flex-col items-center justify-center h-full text-center ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
+                        <FiXCircle size={40} className="mb-4 opacity-70"/>
                         <p className="text-lg mb-4">{error}</p>
                         <button
-                            onClick={() => window.location.reload()}
-                            className="px-4 py-2 bg-blue-600 rounded-lg text-white"
+                            onClick={handleRetry}
+                            className={`px-4 py-2 rounded-lg transition-colors text-white ${
+                                isDarkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'
+                            }`}
                         >
                             Try Again
                         </button>
                     </div>
                 ) : filteredConversations.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-400 text-center py-12">
-                        <FiClock size={48} className="mb-4 text-gray-600" />
+                    <div className={`flex flex-col items-center justify-center h-full text-center py-12 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        <FiClock size={40} className={`mb-4 opacity-50 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
                         <p className="text-lg mb-2">
-                            {searchTerm ? `No conversations matching "${searchTerm}"` : "No conversation history found"}
+                            {searchTerm || filterPeriod !== 'all' ? `No conversations matching criteria` : "No conversation history yet"}
                         </p>
-                        <p className="text-sm text-gray-500 max-w-md">
-                            {searchTerm 
-                                ? "Try a different search term or time filter" 
-                                : "Start chatting with GPTs to see your conversation history here"}
+                        <p className="text-sm max-w-md">
+                            {searchTerm || filterPeriod !== 'all'
+                                ? "Try adjusting your search or time filter." 
+                                : "Start chatting with GPTs to build your history."}
                         </p>
                         
-                        {!searchTerm && (
+                        {!searchTerm && filterPeriod === 'all' && (
                             <button 
                                 onClick={() => navigate('/user/collections')}
-                                className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white"
+                                className={`mt-6 px-4 py-2 rounded-lg transition-colors text-white ${
+                                    isDarkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'
+                                }`}
                             >
                                 Browse Collections
                             </button>
                         )}
                     </div>
                 ) : (
-                    <div className="space-y-3 pb-4">
+                    <div className="space-y-3">
                         {filteredConversations.map((conv) => (
-                            <div 
+                            <ConversationItem 
                                 key={conv.id} 
-                                className="bg-gray-800 border border-gray-700 hover:border-gray-600 rounded-xl p-4 cursor-pointer transition-all"
-                                onClick={() => handleContinueConversation(conv)}
-                            >
-                                <div className="flex justify-between items-start mb-2">
-                                    <div className="flex items-center">
-                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center mr-3">
-                                            <span className="text-white font-medium">{conv.gptName.charAt(0)}</span>
-                                        </div>
-                                        <div>
-                                            <h3 className="font-medium">{conv.gptName}</h3>
-                                            <div className="flex items-center text-xs text-gray-400 mt-0.5">
-                                                <span className="flex items-center">
-                                                    <IoEllipse size={6} className="mr-1 text-green-500" />
-                                                    {conv.model}
-                                                </span>
-                                                <span className="mx-2">•</span>
-                                                <span>{conv.messageCount} messages</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center">
-                                        <span className="text-xs text-gray-400">
-                                            {formatTimestamp(conv.timestamp)}
-                                        </span>
-                                        <button
-                                            onClick={(e) => confirmDeleteConversation(conv, e)}
-                                            className="ml-3 p-1.5 text-gray-500 hover:text-red-400 rounded-full hover:bg-gray-700/50 transition-colors"
-                                        >
-                                            <FiTrash2 size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-                                
-                                <div className="mt-3">
-                                    <p className="text-gray-300 line-clamp-2 text-sm">{conv.lastMessage}</p>
-                                </div>
-                                
-                                <div className="mt-3 flex items-center justify-between">
-                                    <span className="text-xs text-gray-500">
-                                        {conv.summary}
-                                    </span>
-                                    <button 
-                                        className="flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg text-white transition-colors"
-                                    >
-                                        <FiMessageSquare size={12} />
-                                        Continue
-                                    </button>
-                                </div>
-                            </div>
+                                conv={conv} 
+                                formatTimestamp={formatTimestamp} 
+                                onContinue={handleContinueConversation} 
+                                onDelete={confirmDeleteConversation}
+                                isDarkMode={isDarkMode}
+                            />
                         ))}
                     </div>
                 )}
             </div>
-            
-            {/* Delete Confirmation Modal */}
-            {showDeleteConfirm && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                    <div className="bg-gray-800 rounded-xl p-5 w-full max-w-md border border-gray-700">
-                        <h3 className="text-lg font-medium mb-3">Delete Conversation</h3>
-                        <p className="text-gray-300 mb-5">
-                            Are you sure you want to delete this conversation with "{selectedConversation?.gptName}"? This action cannot be undone.
+
+            {showDeleteConfirm && selectedConversation && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div className={`p-6 rounded-lg shadow-xl w-full max-w-sm ${
+                        isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white'
+                    }`}>
+                        <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Delete Conversation?</h3>
+                        <p className={`text-sm mb-5 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                            Are you sure you want to delete the conversation with "{selectedConversation.gptName}"? This action cannot be undone.
                         </p>
                         <div className="flex justify-end gap-3">
-                            <button
-                                onClick={cancelDelete}
-                                className="px-4 py-2 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors"
+                            <button 
+                                onClick={cancelDelete} 
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                    isDarkMode 
+                                        ? 'bg-gray-600 hover:bg-gray-500 text-white' 
+                                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                                }`}
                             >
                                 Cancel
                             </button>
-                            <button
-                                onClick={handleDeleteConversation}
-                                className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white transition-colors"
+                            <button 
+                                onClick={handleDeleteConversation} 
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-red-600 hover:bg-red-700 text-white`}
                             >
                                 Delete
                             </button>
@@ -336,4 +346,4 @@ const HistoryPage = () => {
     );
 };
 
-export default React.memo(HistoryPage); 
+export default HistoryPage; 

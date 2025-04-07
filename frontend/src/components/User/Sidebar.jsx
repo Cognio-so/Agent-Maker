@@ -11,6 +11,7 @@ import {
   IoSettingsOutline
 } from 'react-icons/io5';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { axiosInstance } from '../../api/axiosInstance';
 
 
@@ -20,6 +21,7 @@ const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
   const [activeItem, setActiveItem] = useState(activePage);
   const [assignedGptsCount, setAssignedGptsCount] = useState(0);
   const { logout } = useAuth();
+  const { isDarkMode } = useTheme();
   
   // Fetch assigned GPTs count
   useEffect(() => {
@@ -100,7 +102,11 @@ const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
       <div className="md:hidden fixed top-4 left-4 z-50">
         <button 
           onClick={toggleMobileMenu}
-          className="rounded-full p-2 bg-gray-800 text-white shadow-lg"
+          className={`rounded-full p-2 shadow-lg transition-colors ${
+            isDarkMode 
+              ? 'bg-gray-800 text-white hover:bg-gray-700' 
+              : 'bg-white text-gray-700 hover:bg-gray-100'
+          }`}
         >
           <IoMenuOutline size={24} />
         </button>
@@ -116,7 +122,8 @@ const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
       
       {/* Sidebar */}
       <div 
-        className={`fixed md:relative h-screen bg-[#121212] text-white flex flex-col justify-between transition-all duration-300 ease-in-out z-40
+        className={`fixed md:relative h-screen flex flex-col justify-between transition-all duration-300 ease-in-out z-40
+          ${isDarkMode ? 'bg-[#121212] text-white' : 'bg-gray-50 text-gray-800 border-r border-gray-200'}
           ${isCollapsed ? 'w-[70px]' : 'w-[240px]'}
           ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
@@ -128,7 +135,11 @@ const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
             {!isCollapsed && <h1 className="text-xl font-bold">AI Agent</h1>}
             <button 
               onClick={toggleSidebar}
-              className="rounded-full p-1.5 bg-white/10 hover:bg-white/20 transition-colors hidden md:flex items-center justify-center"
+              className={`rounded-full p-1.5 transition-colors hidden md:flex items-center justify-center ${
+                isDarkMode 
+                  ? 'bg-white/10 hover:bg-white/20 text-white' 
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-600'
+              }`}
             >
               {isCollapsed ? <IoChevronForwardOutline size={16} /> : <IoChevronBackOutline size={16} />}
             </button>
@@ -142,8 +153,10 @@ const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
                 onClick={() => handleNavigation(item.id)}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} px-4 py-3 rounded-lg text-left transition-colors ${
                   activeItem === item.id 
-                    ? 'bg-white/10 text-white' 
-                    : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                    ? (isDarkMode ? 'bg-white/10 text-white' : 'bg-blue-100 text-blue-700 font-medium') 
+                    : (isDarkMode 
+                        ? 'text-gray-400 hover:bg-white/5 hover:text-white' 
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900')
                 }`}
                 title={isCollapsed ? item.label : ''}
               >
@@ -162,7 +175,11 @@ const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
         <div className="px-2 pb-6">
           <button 
             onClick={handleLogout}
-            className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} w-full px-4 py-3 text-gray-400 hover:bg-white/5 hover:text-white rounded-lg text-left transition-colors`}
+            className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} w-full px-4 py-3 rounded-lg text-left transition-colors ${
+              isDarkMode 
+                ? 'text-gray-400 hover:bg-white/5 hover:text-white' 
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            }`}
             title={isCollapsed ? 'Logout' : ''}
           >
             <span className="flex items-center justify-center"><IoExitOutline size={20} /></span>
