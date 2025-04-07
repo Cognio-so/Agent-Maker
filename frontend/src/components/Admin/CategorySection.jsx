@@ -57,9 +57,9 @@ const CategorySection = ({ title, agentCount, agents }) => {
             {isMobileView ? (
                 // Mobile list view
                 <div className="bg-gray-900 rounded-lg overflow-hidden mb-4">
-                    {agents.map((agent, index) => (
+                    {agents.map((agent) => (
                         <MobileAgentItem 
-                            key={index} 
+                            key={agent.id}
                             agent={agent} 
                             onClick={() => navigate(`/admin/chat/${agent.id}`)} 
                         />
@@ -68,9 +68,10 @@ const CategorySection = ({ title, agentCount, agents }) => {
             ) : (
                 // Desktop grid view
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
-                    {agents.map((agent, index) => (
+                    {agents.map((agent) => (
                         <AgentCard
-                            key={index}
+                            key={agent.id}
+                            agentId={agent.id}
                             agentImage={agent.image}
                             agentName={agent.name}
                             status={agent.status}
@@ -85,4 +86,4 @@ const CategorySection = ({ title, agentCount, agents }) => {
     );
 };
 
-export default CategorySection; 
+export default React.memo(CategorySection); 

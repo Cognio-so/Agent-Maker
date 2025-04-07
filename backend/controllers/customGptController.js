@@ -420,23 +420,16 @@ const deleteKnowledgeFile = async (req, res) => {
 
 const getAllCustomGpts = async (req, res) => {
   try {
+     
+    const filter = {};
 
-    if (!req.user || req.user.role !== 'admin') {
-      console.warn(`Unauthorized attempt to access getAllCustomGpts by user: ${req.user?._id}, role: ${req.user?.role}`);
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Admin privileges required.'
-      });
-    }
-
-    const customGpts = await CustomGpt.find().populate('createdBy', 'name email');
-
-    return res.status(200).json({
+    const customGpts = await CustomGpt.find(filter); 
+    res.status(200).json({
       success: true,
       customGpts
     });
   } catch (error) {
-    console.error('Error fetching all custom GPTs:', error);
+    console.error('Error fetching all accessible custom GPTs:', error);
     return res.status(500).json({
       success: false,
       message: 'Error fetching custom GPTs'
@@ -444,7 +437,6 @@ const getAllCustomGpts = async (req, res) => {
   }
 };
 
-// Get GPTs assigned to a specific user
 const getUserAssignedGpts = async (req, res) => {
   try {
     const userId = req.user._id;

@@ -32,4 +32,4 @@ const AgentCard = ({ agentId, agentImage, agentName, status, userCount, messageC
     );
 };
 
-export default AgentCard; 
+export default React.memo(AgentCard); 

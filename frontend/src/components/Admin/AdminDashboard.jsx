@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, lazy, Suspense } from 'react';
 import AdminSidebar from './AdminSidebar';
-import CreateCustomGpt from './CreateCustomGpt';
+const CreateCustomGpt = lazy(() => import('./CreateCustomGpt'));
 import { FiSearch, FiChevronDown, FiChevronUp, FiGrid, FiList, FiMenu } from 'react-icons/fi';
 import AgentCard from './AgentCard';
 import CategorySection from './CategorySection';
@@ -8,6 +8,7 @@ import { axiosInstance } from '../../api/axiosInstance';
 
 
 // Default image for agents without images
+const defaultAgentImage = 'path/to/your/default/image.png';
 
 
 const AdminDashboard = ({ userName = "Admin User" }) => {
@@ -29,7 +30,24 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
     });
     const [gptCreated, setGptCreated] = useState(false);
 
-    // Fetch agents data from the backend
+    // Helper function for sorting (used in useMemo)
+    const applySorting = (data, sortOpt) => {
+        if (sortOpt === 'Default') return data; 
+
+        const sortedData = { ...data }; 
+
+        const sortFn = sortOpt === 'Latest'
+            ? (a, b) => new Date(b.createdAt) - new Date(a.createdAt) 
+            : (a, b) => new Date(a.createdAt) - new Date(b.createdAt);
+
+        Object.keys(sortedData).forEach(category => {
+            if (Array.isArray(sortedData[category])) {
+                 sortedData[category] = [...sortedData[category]].sort(sortFn); 
+            }
+        });
+        return sortedData;
+    };
+
     useEffect(() => {
         const fetchAgents = async () => {
             try {
@@ -39,12 +57,10 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                 });
 
                 if (response.data.success && response.data.customGpts) {
-                    // Sort by creation date (newest first)
                     const sortedGpts = [...response.data.customGpts].sort((a, b) =>
                         new Date(b.createdAt) - new Date(a.createdAt)
                     );
 
-                    // Categorize GPTs based on their description or name
                     const categorizedData = {
                         featured: [],
                         productivity: [],
@@ -52,31 +68,30 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                         entertainment: []
                     };
 
-                    // Take the 4 most recent for featured
                     categorizedData.featured = sortedGpts.slice(0, 4).map(gpt => ({
                         id: gpt._id,
                         image: gpt.imageUrl || defaultAgentImage,
                         name: gpt.name,
-                        status: Math.random() > 0.5 ? 'online' : 'offline', // Random status for demo
-                        userCount: Math.floor(Math.random() * 100) + 10, // Random metrics for demo
-                        messageCount: Math.floor(Math.random() * 400) + 50,
-                        modelType: gpt.model
+                        status: gpt.status || 'unknown',
+                        userCount: gpt.userCount || 0,
+                        messageCount: gpt.messageCount || 0,
+                        modelType: gpt.model,
+                        createdAt: gpt.createdAt
                     }));
 
-                    // Categorize the rest based on keywords in description or name
                     sortedGpts.forEach(gpt => {
                         const text = (gpt.description + ' ' + gpt.name).toLowerCase();
                         const agent = {
                             id: gpt._id,
                             image: gpt.imageUrl || defaultAgentImage,
                             name: gpt.name,
-                            status: Math.random() > 0.5 ? 'online' : 'offline',
-                            userCount: Math.floor(Math.random() * 100) + 10,
-                            messageCount: Math.floor(Math.random() * 400) + 50,
-                            modelType: gpt.model
+                            status: gpt.status || 'unknown',
+                            userCount: gpt.userCount || 0,
+                            messageCount: gpt.messageCount || 0,
+                            modelType: gpt.model,
+                            createdAt: gpt.createdAt
                         };
 
-                        // Skip if already in featured
                         if (categorizedData.featured.some(a => a.name === gpt.name)) {
                             return;
                         }
@@ -88,7 +103,6 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                         } else if (text.includes('game') || text.includes('movie') || text.includes('fun')) {
                             categorizedData.entertainment.push(agent);
                         } else {
-                            // Random assignment if no match
                             const categories = ['productivity', 'education', 'entertainment'];
                             const randomCategory = categories[Math.floor(Math.random() * categories.length)];
                             categorizedData[randomCategory].push(agent);
@@ -96,10 +110,12 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                     });
 
                     setAgentsData(categorizedData);
+                } else {
+                    setError(response.data.message || "Failed to load agents data: Invalid response format");
                 }
             } catch (err) {
                 console.error("Error fetching agents:", err);
-                setError("Failed to load agents data");
+                setError(`Failed to load agents data. ${err.response?.data?.message || err.message || ''}`);
             } finally {
                 setLoading(false);
             }
@@ -108,7 +124,6 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
         fetchAgents();
     }, [gptCreated]);
 
-    // Handle window resize
     useEffect(() => {
         const handleResize = () => {
             if (window.innerWidth >= 640) {
@@ -119,30 +134,31 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Filter agents based on search term
     const filteredAgentsData = useMemo(() => {
-        if (!searchTerm.trim()) {
-            return agentsData;
+        const searchTermLower = searchTerm.toLowerCase().trim();
+        if (!searchTermLower) {
+            return applySorting(agentsData, sortOption); 
         }
-        const searchTermLower = searchTerm.toLowerCase();
+
         const filtered = {};
         Object.keys(agentsData).forEach(category => {
             filtered[category] = agentsData[category].filter(agent =>
                 agent.name.toLowerCase().includes(searchTermLower) ||
-                agent.modelType.toLowerCase().includes(searchTermLower)
+                (agent.modelType && agent.modelType.toLowerCase().includes(searchTermLower)) // Check if modelType exists
             );
         });
-        return filtered;
-    }, [searchTerm, agentsData]);
 
-    // Sort agents based on sort option
+        return applySorting(filtered, sortOption); 
+
+    }, [searchTerm, agentsData, sortOption]); 
+
     useEffect(() => {
         if (sortOption === 'Default') return;
 
         const sortedAgents = { ...agentsData };
         const sortFn = sortOption === 'Latest'
-            ? (a, b) => b.userCount - a.userCount
-            : (a, b) => a.userCount - b.userCount;
+            ? (a, b) => b.createdAt - a.createdAt
+            : (a, b) => a.createdAt - b.createdAt;
 
         Object.keys(sortedAgents).forEach(category => {
             sortedAgents[category] = [...sortedAgents[category]].sort(sortFn);
@@ -151,7 +167,6 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
         setAgentsData(sortedAgents);
     }, [sortOption]);
 
-    // Close dropdown if clicked outside
     useEffect(() => {
         function handleClickOutside(event) {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -169,12 +184,10 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
         setIsSortOpen(false);
     };
 
-    // Check if we have any search results
     const hasSearchResults = Object.values(filteredAgentsData).some(
         category => category.length > 0
     );
 
-    // Loading state
     if (loading) {
         return (
             <div className="flex h-screen bg-black text-white items-center justify-center">
@@ -183,7 +196,6 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
         );
     }
 
-    // Error state
     if (error) {
         return (
             <div className="flex h-screen bg-black text-white items-center justify-center">
@@ -297,7 +309,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                             ) : (
                                 <>
                                     {/* Featured Agents Section - Added flex-shrink-0 */}
-                                    {(!searchTerm || filteredAgentsData.featured.length > 0) && (
+                                    {filteredAgentsData.featured && filteredAgentsData.featured.length > 0 && (
                                         <div className="mb-6 flex-shrink-0">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h2 className="text-base sm:text-lg md:text-xl font-semibold">Featured Agents</h2>
@@ -305,9 +317,9 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                             </div>
                                             {/* Use grid layout for both mobile (1 col) and desktop */}
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
-                                                {filteredAgentsData.featured.map((agent, index) => (
+                                                {filteredAgentsData.featured.map((agent) => (
                                                     <AgentCard
-                                                        key={index}
+                                                        key={agent.id || agent.name}
                                                         agentId={agent.id}
                                                         agentImage={agent.image}
                                                         agentName={agent.name}
@@ -378,13 +390,15 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                     </>
                 ) : (
                     <div className="h-full">
-                        <CreateCustomGpt
-                            onGoBack={() => setShowCreateGpt(false)}
-                            onGptCreated={() => {
-                                setGptCreated(prev => !prev);
-                                setShowCreateGpt(false);
-                            }}
-                        />
+                        <Suspense fallback={<div className="flex h-full items-center justify-center">Loading Editor...</div>}>
+                            <CreateCustomGpt
+                                onGoBack={() => setShowCreateGpt(false)}
+                                onGptCreated={() => {
+                                    setGptCreated(prev => !prev);
+                                    setShowCreateGpt(false);
+                                }}
+                            />
+                        </Suspense>
                     </div>
                 )}
             </div>
