@@ -439,7 +439,7 @@ const getAllCustomGpts = async (req, res) => {
 
 const getUserAssignedGpts = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.params.userId || req.user._id;
 
     const assignments = await UserGptAssignment.find({ userId })
       .populate({
@@ -447,11 +447,22 @@ const getUserAssignedGpts = async (req, res) => {
         select: 'name description imageUrl model capabilities knowledgeFiles'
       });
 
-    const assignedGpts = assignments.map(assignment => assignment.gptId);
+    // Format response to match frontend expectations
+    const gpts = assignments.map(assignment => ({
+      _id: assignment.gptId._id,
+      id: assignment.gptId._id, // Add both id formats for compatibility
+      name: assignment.gptId.name,
+      description: assignment.gptId.description,
+      imageUrl: assignment.gptId.imageUrl,
+      model: assignment.gptId.model,
+      capabilities: assignment.gptId.capabilities,
+      knowledgeFiles: assignment.gptId.knowledgeFiles,
+      assignedAt: assignment.createdAt
+    }));
 
     return res.status(200).json({
       success: true,
-      assignedGpts
+      gpts // Change key name to match frontend expectations
     });
   } catch (error) {
     console.error('Error fetching user assigned GPTs:', error);

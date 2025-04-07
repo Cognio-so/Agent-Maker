@@ -16,7 +16,9 @@ import {
 import AssignGptsModal from './AssignGptsModal';
 import TeamMemberDetailsModal from './TeamMemberDetailsModal';
 import InviteTeamMemberModal from './InviteTeamMemberModal';
+import EditPermissionsModal from './EditPermissionsModal';
 import { axiosInstance } from '../../api/axiosInstance';
+import { toast } from 'react-toastify';
 
 // API URL from environment variables
 
@@ -51,6 +53,8 @@ const TeamManagement = () => {
     const [pendingInvitesCount, setPendingInvitesCount] = useState(0);
     const [assignmentChanged, setAssignmentChanged] = useState(false);
     const [refreshInterval, setRefreshInterval] = useState(null);
+    const [showEditPermissionsModal, setShowEditPermissionsModal] = useState(false);
+    const [selectedMemberForPermissions, setSelectedMemberForPermissions] = useState(null);
     
     // Add responsive detection
     useEffect(() => {
@@ -62,56 +66,111 @@ const TeamManagement = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
     
-    // Fetch users from the backend
-    useEffect(() => {
-        const fetchUsers = async () => {
-            try {
-                setLoading(true);
-                // Get all users - Note: You need to implement this endpoint in the backend
-                const response = await axiosInstance.get(`/api/auth/users`, { 
-                    withCredentials: true 
-                });
+    // Improved error handling for API calls
+    const handleApiError = (error, defaultMessage) => {
+        console.error(defaultMessage, error);
+        const errorMessage = error.response?.data?.message || defaultMessage;
+        toast?.error(errorMessage);
+        return errorMessage;
+    };
+    
+    // Function to format date (should be defined before use or moved outside component)
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+    
+    // DEFINE fetchGptCounts FIRST
+    const fetchGptCounts = useCallback(async (currentMembers) => { // Accept members as argument
+        const membersToCount = currentMembers || teamMembers; 
+        
+        if (!membersToCount || membersToCount.length === 0) {
+            return;
+        }
+        
+        try {
+            const response = await axiosInstance.get('/api/custom-gpts/team/gpt-counts', { 
+                withCredentials: true 
+            });
+            
+            
+            if (response.data?.success && response.data?.userGptCounts) {
+                const counts = response.data.userGptCounts;
                 
-                if (response.data && response.data.users) {
-                    // Transform user data to match the component's expected format
-                    const formattedUsers = response.data.users.map(user => {
-                        // Determine if user is active based on lastActive timestamp
-                        // Consider a user inactive if they haven't been active in the last 24 hours
-                        const isActive = user.lastActive 
-                            ? (new Date() - new Date(user.lastActive)) < 24 * 60 * 60 * 1000 
-                            : false;
-                        
+                setTeamMembers(prev => {
+                    const baseMembers = currentMembers || prev; 
+                    const updatedMembers = baseMembers.map(member => {
+                        const count = counts[member.id] || 0;
                         return {
-                            id: user._id,
-                            name: user.name,
-                            email: user.email,
-                            role: user.role,
-                            department: user.department || 'Not Assigned',
-                            position: user.position || '',
-                            joined: formatDate(user.createdAt),
-                            lastActive: user.lastActive ? formatDate(user.lastActive) : 'Never',
-                            status: isActive ? 'Active' : 'Inactive',
-                            assignedGPTs: 0
+                            ...member,
+                            assignedGPTs: count
                         };
                     });
-                    setTeamMembers(formattedUsers);
-                } else {
-                    // If we can't fetch users, fall back to the sample data
-                    setTeamMembers(getSampleTeamData());
-                    console.warn("Couldn't fetch real user data, using sample data");
-                }
-            } catch (err) {
-                console.error("Error fetching users:", err);
-                setError("Failed to load team data");
-                // Fall back to sample data if API fails
-                setTeamMembers(getSampleTeamData());
-            } finally {
-                setLoading(false);
+                    return updatedMembers;
+                });
+            } else {
+                console.warn("GPT counts response was not successful or missing userGptCounts:", response.data);
             }
-        };
-        
+        } catch (err) {
+            console.error("Error fetching GPT assignments:", err);
+            toast.error("Could not load GPT assignment data");
+        }
+    }, []); // Empty dependency array is correct here
+
+    // NOW DEFINE fetchUsers
+    const fetchUsers = useCallback(async () => {
+        try {
+            setLoading(true);
+            const response = await axiosInstance.get(`/api/auth/users`, { 
+                withCredentials: true 
+            });
+            
+            if (response.data && response.data.users) {
+                const formattedUsers = response.data.users.map(user => {
+                    const isActive = user.lastActive 
+                        ? (new Date() - new Date(user.lastActive)) < 24 * 60 * 60 * 1000 
+                        : false;
+                    
+                    return {
+                        id: user._id,
+                        name: user.name,
+                        email: user.email,
+                        role: user.role || 'Employee',
+                        department: user.department || 'Not Assigned',
+                        position: user.position || '',
+                        joined: formatDate(user.createdAt),
+                        lastActive: user.lastActive ? formatDate(user.lastActive) : 'Never',
+                        status: isActive ? 'Active' : 'Inactive',
+                        assignedGPTs: 0
+                    };
+                });
+                // Don't set state here directly if fetchGptCounts will do it
+                // setTeamMembers(formattedUsers); 
+                await fetchGptCounts(formattedUsers); // Pass the newly fetched users
+                setError(null);
+            } else {
+                console.warn("API response missing users data, using sample data");
+                // setTeamMembers(getSampleTeamData()); 
+            }
+        } catch (err) {
+            console.error("Error fetching team members:", err);
+            setError("Failed to load team data. Please check your connection.");
+            // setTeamMembers(getSampleTeamData());
+        } finally {
+            setLoading(false);
+        }
+    // fetchGptCounts MUST be defined before this point
+    }, [fetchGptCounts]); 
+
+    // Initial mount effect - only fetches users
+    useEffect(() => {
         fetchUsers();
-    }, []);
+    }, [fetchUsers]); // Depends only on fetchUsers
     
     // Fetch pending invites count
     useEffect(() => {
@@ -133,31 +192,6 @@ const TeamManagement = () => {
         fetchPendingInvites();
     }, []);
     
-    // Update the useEffect to depend on assignmentChanged
-    useEffect(() => {
-        const fetchGptCounts = async () => {
-            try {
-                const response = await axiosInstance.get(`/api/custom-gpts/team/gpt-counts`, { 
-                    withCredentials: true 
-                });
-                
-                if (response.data.success && response.data.userGptCounts) {
-                    setTeamMembers(prev => prev.map(member => ({
-                        ...member,
-                        assignedGPTs: response.data.userGptCounts[member.id] || 0
-                    })));
-                }
-            } catch (err) {
-                console.error("Error fetching GPT counts:", err);
-            }
-        };
-
-        if (!loading && teamMembers.length > 0) {
-            fetchGptCounts();
-        }
-    }, [teamMembers.length, loading, assignmentChanged]);
-    
-    // Filter team members based on search term, department, and status
     const filteredMembers = teamMembers.filter(member => {
         const matchesSearch = 
             member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -193,16 +227,6 @@ const TeamManagement = () => {
         setShowDetailsModal(true);
     };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-    };
-
     // CSS for hiding scrollbars
     const scrollbarHideStyles = `
         .hide-scrollbar::-webkit-scrollbar {
@@ -214,10 +238,52 @@ const TeamManagement = () => {
         }
     `;
 
+    // Email team member function
+    const handleEmailTeamMember = async (email) => {
+        // Open default email client with recipient's address
+        window.location.href = `mailto:${email}`;
+        setShowActionsMenu(null);
+    };
+    
+    // Edit permissions function
+    const handleEditPermissions = (member) => {
+        setSelectedMemberForPermissions(member);
+        setShowEditPermissionsModal(true);
+        setShowActionsMenu(null); // Close the actions menu
+    };
+    
+    // Handle remove team member
+    const handleRemoveTeamMember = async (memberId) => {
+        if (window.confirm("Are you sure you want to remove this team member?")) {
+            try {
+                // This endpoint would need to be implemented in the backend
+                await axiosInstance.delete(`/api/auth/users/${memberId}`, {
+                    withCredentials: true
+                });
+                
+                // Remove user from local state
+                setTeamMembers(prev => prev.filter(member => member.id !== memberId));
+                toast?.success("Team member removed successfully");
+            } catch (err) {
+                handleApiError(err, "Failed to remove team member");
+            }
+        }
+        setShowActionsMenu(null);
+    };
+
+    // Add function to handle permission updates
+    const handlePermissionsUpdated = (updatedMember) => {
+        setTeamMembers(prev => 
+            prev.map(member => 
+                member.id === updatedMember.id ? updatedMember : member
+            )
+        );
+    };
+
     // Mobile card view for team members
     const MobileTeamMemberCard = ({ member }) => (
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 mb-3">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-3 relative">
                 <div className="flex items-center">
                     <div className="h-10 w-10 bg-gray-600 rounded-full flex items-center justify-center text-white mr-3">
                         {member.name.charAt(0)}
@@ -230,36 +296,43 @@ const TeamManagement = () => {
                         <div className="text-sm text-gray-400">{member.email}</div>
                     </div>
                 </div>
-                <button 
+                <button
                     onClick={() => toggleActionsMenu(member.id)}
                     className="text-gray-400 hover:text-gray-300 p-1"
                 >
                     <FiMoreVertical />
                 </button>
-                
+
                 {showActionsMenu === member.id && (
-                    <div className="absolute right-0 top-8 mt-2 w-48 rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-20">
+                    <div className="absolute right-0 top-8 mt-2 w-48 rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50">
                         <div className="py-1" role="menu" aria-orientation="vertical">
-                            <button 
+                            <button
                                 className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                onClick={() => console.log("Email", member.email)}
+                                onClick={() => handleEmailTeamMember(member.email)}
                             >
                                 <FiMail className="inline mr-2" />
                                 Email
                             </button>
-                            <button 
+                            <button
                                 className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                onClick={() => console.log("Edit permissions", member.id)}
+                                onClick={() => handleEditPermissions(member)}
                             >
                                 <FiEdit className="inline mr-2" />
                                 Edit permissions
                             </button>
-                            <button 
+                            <button
                                 className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
                                 onClick={() => handleAssignGpts(member)}
                             >
                                 <FiBox className="inline mr-2" />
                                 Assign GPTs
+                            </button>
+                            <button
+                                className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-600"
+                                onClick={() => handleRemoveTeamMember(member.id)}
+                            >
+                                <FiTrash2 className="inline mr-2" />
+                                Remove
                             </button>
                         </div>
                     </div>
@@ -298,12 +371,11 @@ const TeamManagement = () => {
         </div>
     );
 
-    // Pass this function to the AssignGptsModal
+    // Pass this function to the AssignGptsModal - it should trigger a recount
     const handleGptAssignmentChange = () => {
-        // Immediately fetch updated GPT counts
-        fetchGptCounts();
-        // Also toggle the state variable to trigger the useEffect
-        setAssignmentChanged(prev => !prev);
+        // Fetch counts using the current state
+        fetchGptCounts(teamMembers); 
+        setAssignmentChanged(prev => !prev); // Still useful for triggering other potential effects if needed
     };
 
     // Fix #4: Add a click-away handler to close any open menus when clicking elsewhere
@@ -338,7 +410,7 @@ const TeamManagement = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Add this function to refresh data
+    // Update refreshUserData to call fetchGptCounts correctly
     const refreshUserData = useCallback(async () => {
         try {
             const response = await axiosInstance.get(`/api/auth/users`, { 
@@ -346,12 +418,9 @@ const TeamManagement = () => {
             });
             
             if (response.data && response.data.users) {
-                // Transform with UTC time handling
                 const formattedUsers = response.data.users.map(user => {
-                    // Force date to be handled as UTC
-                    const lastActiveDate = user.lastActive ? new Date(user.lastActive) : null;
-                    const isActive = lastActiveDate 
-                        ? (new Date() - lastActiveDate) < 24 * 60 * 60 * 1000 
+                    const isActive = user.lastActive 
+                        ? (new Date() - new Date(user.lastActive)) < 24 * 60 * 60 * 1000 
                         : false;
                     
                     return {
@@ -368,30 +437,12 @@ const TeamManagement = () => {
                     };
                 });
                 setTeamMembers(formattedUsers);
-                fetchGptCounts();
+                await fetchGptCounts(formattedUsers);
             }
         } catch (err) {
             console.error("Error refreshing users:", err);
         }
-    }, []);
-
-    // Add this as a separate function to be called when needed
-    const fetchGptCounts = async () => {
-        try {
-            const response = await axiosInstance.get(`/api/custom-gpts/team/gpt-counts`, { 
-                withCredentials: true 
-            });
-            
-            if (response.data.success && response.data.userGptCounts) {
-                setTeamMembers(prev => prev.map(member => ({
-                    ...member,
-                    assignedGPTs: response.data.userGptCounts[member.id] || 0
-                })));
-            }
-        } catch (err) {
-            console.error("Error fetching GPT counts:", err);
-        }
-    };
+    }, [fetchGptCounts]);
 
     if (loading) {
         return (
@@ -648,7 +699,7 @@ const TeamManagement = () => {
                     
                     {/* Table Body (Scrollable with hidden scrollbar) */}
                     <div className="flex-1 px-4 md:px-6 pb-6 overflow-auto hide-scrollbar">
-                        <div className="bg-gray-800 rounded-b-lg shadow overflow-hidden border border-gray-700 border-t-0">
+                        <div className="bg-gray-800 rounded-b-lg shadow border border-gray-700 border-t-0">
                             {filteredMembers.length === 0 ? (
                                 <div className="p-6 text-center text-gray-400">
                                     {searchTerm ? 'No members match your search criteria' : 'No team members found'}
@@ -733,7 +784,7 @@ const TeamManagement = () => {
                                                 
                                                 {/* Actions column */}
                                                 <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-                                                    <button 
+                                                    <button
                                                         onClick={() => toggleActionsMenu(member.id)}
                                                         className="text-gray-400 hover:text-gray-300"
                                                     >
@@ -741,32 +792,32 @@ const TeamManagement = () => {
                                                     </button>
                                                     
                                                     {showActionsMenu === member.id && (
-                                                        <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-20">
+                                                        <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50">
                                                             <div className="py-1" role="menu" aria-orientation="vertical">
-                                                                <button 
+                                                                <button
                                                                     className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                                                    onClick={() => console.log("Email", member.email)}
+                                                                    onClick={() => handleEmailTeamMember(member.email)}
                                                                 >
                                                                     <FiMail className="inline mr-2" />
                                                                     Email
                                                                 </button>
-                                                                <button 
+                                                                <button
                                                                     className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                                                    onClick={() => console.log("Edit permissions", member.id)}
+                                                                    onClick={() => handleEditPermissions(member)}
                                                                 >
                                                                     <FiEdit className="inline mr-2" />
                                                                     Edit permissions
                                                                 </button>
-                                                                <button 
+                                                                <button
                                                                     className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
                                                                     onClick={() => handleAssignGpts(member)}
                                                                 >
                                                                     <FiBox className="inline mr-2" />
                                                                     Assign GPTs
                                                                 </button>
-                                                                <button 
+                                                                <button
                                                                     className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-600"
-                                                                    onClick={() => console.log("Remove", member.id)}
+                                                                    onClick={() => handleRemoveTeamMember(member.id)}
                                                                 >
                                                                     <FiTrash2 className="inline mr-2" />
                                                                     Remove
@@ -829,40 +880,21 @@ const TeamManagement = () => {
                 isOpen={showInviteModal}
                 onClose={() => setShowInviteModal(false)}
             />
+            {showEditPermissionsModal && (
+                <EditPermissionsModal
+                    isOpen={showEditPermissionsModal}
+                    onClose={() => setShowEditPermissionsModal(false)}
+                    member={selectedMemberForPermissions}
+                    onPermissionsUpdated={handlePermissionsUpdated}
+                />
+            )}
         </div>
     );
 };
 
-// Function to get sample data as a fallback
-// This will be used only if fetching from API fails
+// Sample data function should ideally be outside the component
 function getSampleTeamData() {
-    return [
-        {
-            id: 1,
-            name: 'Emily Johnson',
-            email: 'emily@gptnexus.com',
-            role: 'Admin',
-            department: 'Product',
-            position: 'Product Manager',
-            joined: 'Mar 15, 2022',
-            lastActive: 'Apr 2, 2023',
-            status: 'Active',
-            assignedGPTs: 8
-        },
-        {
-            id: 2,
-            name: 'Michael Chen',
-            email: 'michael@gptnexus.com',
-            role: 'Employee',
-            department: 'Engineering',
-            position: 'Senior Developer',
-            joined: 'Jan 10, 2022',
-            lastActive: 'Apr 3, 2023',
-            status: 'Active',
-            assignedGPTs: 12
-        },
-        // Add more sample users if needed
-    ];
+    // ... sample data ...
 }
 
 export default TeamManagement; 

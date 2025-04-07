@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Signup, Login, Logout, googleAuth, googleAuthCallback, refreshTokenController, getCurrentUser, getAllUsers, inviteTeamMember, getPendingInvitesCount, setInactive } = require('../controllers/AuthContoller');
+const { Signup, Login, Logout, googleAuth, googleAuthCallback, refreshTokenController, getCurrentUser, getAllUsers, inviteTeamMember, getPendingInvitesCount, setInactive, removeTeamMember } = require('../controllers/AuthContoller');
 const passport = require('passport');
 const { protectRoute } = require('../middleware/authMiddleware'); // Imports protectRoute
 
@@ -27,5 +27,8 @@ router.post('/invite', protectRoute, inviteTeamMember);
 router.get('/pending-invites/count', protectRoute, getPendingInvitesCount);
 
 router.put('/me/inactive', protectRoute, setInactive); 
+
+router.delete('/users/:userId', protectRoute, removeTeamMember);
+
 
 module.exports = router;

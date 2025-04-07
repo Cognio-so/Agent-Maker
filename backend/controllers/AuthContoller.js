@@ -226,6 +226,25 @@ const getAllUsers = async (req, res) => {
     }
 };
 
+const removeTeamMember = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        
+        // Check if user exists
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        // Delete user
+        await User.findByIdAndDelete(userId);
+        
+        res.status(200).json({ success: true, message: 'User removed successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 // Create transporter
 const transporter = nodemailer.createTransport({
   service: process.env.EMAIL_SERVICE || 'gmail',
@@ -369,4 +388,4 @@ const setInactive = async (req, res) => {
     }
 };
 
-module.exports = { Signup, Login, Logout, googleAuth, googleAuthCallback, refreshTokenController, getCurrentUser, getAllUsers, inviteTeamMember, getPendingInvitesCount, setInactive };
+module.exports = { Signup, Login, Logout, googleAuth, googleAuthCallback, refreshTokenController, getCurrentUser, getAllUsers, inviteTeamMember, getPendingInvitesCount, setInactive, removeTeamMember };

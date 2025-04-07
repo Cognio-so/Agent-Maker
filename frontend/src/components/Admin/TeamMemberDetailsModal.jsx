@@ -10,17 +10,192 @@ import {
     IoAppsOutline
 } from 'react-icons/io5';
 import { FiBox, FiMessageSquare, FiActivity} from 'react-icons/fi';
-import { axiosInstance } from '../../api/axiosInstance';    
+import { axiosInstance } from '../../api/axiosInstance';
+import { toast } from 'react-toastify';
+import AssignGptsModal from './AssignGptsModal';
 
 const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
     const [activeTab, setActiveTab] = useState('profile');
+    const [memberGpts, setMemberGpts] = useState([]);
+    const [userActivity, setUserActivity] = useState([]);
+    const [userNotes, setUserNotes] = useState([]);
+    const [loading, setLoading] = useState({
+        gpts: false,
+        activity: false,
+        notes: false
+    });
+    const [noteText, setNoteText] = useState('');
+    const [showAssignGptsModal, setShowAssignGptsModal] = useState(false);
+
+    // Fetch assigned GPTs when the modal opens or tab changes
+    useEffect(() => {
+        if (!isOpen || !member || activeTab !== 'gpts') return;
+        
+        const fetchAssignedGpts = async () => {
+            setLoading(prev => ({ ...prev, gpts: true }));
+            try {
+                const response = await axiosInstance.get(`/api/custom-gpts/team/members/${member.id}/gpts`, {
+                    withCredentials: true
+                });
+                
+                if (response.data && response.data.gpts) {
+                    setMemberGpts(response.data.gpts);
+                }
+            } catch (error) {
+                console.error("Error fetching assigned GPTs:", error);
+                toast.error("Could not load assigned GPTs");
+            } finally {
+                setLoading(prev => ({ ...prev, gpts: false }));
+            }
+        };
+        
+        fetchAssignedGpts();
+    }, [isOpen, member, activeTab]);
+
+    // Fetch user activity when the activity tab is selected
+    useEffect(() => {
+        if (!isOpen || !member || activeTab !== 'activity') return;
+        
+        const fetchUserActivity = async () => {
+            setLoading(prev => ({ ...prev, activity: true }));
+            try {
+                const response = await axiosInstance.get(`/api/auth/users/${member.id}/activity`, {
+                    withCredentials: true
+                });
+                
+                if (response.data && response.data.activities) {
+                    setUserActivity(response.data.activities);
+                }
+            } catch (error) {
+                console.error("Error fetching user activity:", error);
+                // Fallback to sample data for now
+                setUserActivity([
+                    { type: 'gpt_usage', gptName: 'Customer Support Assistant', messages: 14, date: new Date().toISOString() },
+                    { type: 'gpt_usage', gptName: 'Data Analyst', messages: 8, date: new Date(Date.now() - 86400000).toISOString() },
+                    { type: 'login', date: new Date(Date.now() - 172800000).toISOString() },
+                    { type: 'gpt_usage', gptName: 'Marketing Assistant', messages: 22, date: new Date(Date.now() - 259200000).toISOString() }
+                ]);
+            } finally {
+                setLoading(prev => ({ ...prev, activity: false }));
+            }
+        };
+        
+        fetchUserActivity();
+    }, [isOpen, member, activeTab]);
+
+    // Fetch user notes when the notes tab is selected
+    useEffect(() => {
+        if (!isOpen || !member || activeTab !== 'notes') return;
+        
+        const fetchUserNotes = async () => {
+            setLoading(prev => ({ ...prev, notes: true }));
+            try {
+                const response = await axiosInstance.get(`/api/auth/users/${member.id}/notes`, {
+                    withCredentials: true
+                });
+                
+                if (response.data && response.data.notes) {
+                    setUserNotes(response.data.notes);
+                }
+            } catch (error) {
+                console.error("Error fetching user notes:", error);
+                // Fallback to sample data for now
+                setUserNotes([
+                    { id: 1, text: 'Completed onboarding process, assigned initial GPTs for marketing tasks.', createdBy: 'Admin User', createdAt: new Date(Date.now() - 1209600000).toISOString() }
+                ]);
+            } finally {
+                setLoading(prev => ({ ...prev, notes: false }));
+            }
+        };
+        
+        fetchUserNotes();
+    }, [isOpen, member, activeTab]);
+
+    // Handle adding a new note
+    const handleAddNote = async () => {
+        if (!noteText.trim()) return;
+        
+        try {
+            const response = await axiosInstance.post(`/api/auth/users/${member.id}/notes`, {
+                text: noteText.trim()
+            }, {
+                withCredentials: true
+            });
+            
+            if (response.data && response.data.note) {
+                setUserNotes(prev => [response.data.note, ...prev]);
+                setNoteText('');
+                toast.success('Note added successfully');
+            }
+        } catch (error) {
+            console.error("Error adding note:", error);
+            toast.error('Failed to add note');
+        }
+    };
+
+    // Handle removing a note
+    const handleRemoveNote = async (noteId) => {
+        try {
+            await axiosInstance.delete(`/api/auth/users/${member.id}/notes/${noteId}`, {
+                withCredentials: true
+            });
+            
+            setUserNotes(prev => prev.filter(note => note.id !== noteId));
+            toast.success('Note removed successfully');
+        } catch (error) {
+            console.error("Error removing note:", error);
+            toast.error('Failed to remove note');
+        }
+    };
+
+    // Handle removing a GPT assignment
+    const handleRemoveGpt = async (gptId) => {
+        try {
+            await axiosInstance.delete(`/api/custom-gpts/team/members/${member.id}/gpts/${gptId}`, {
+                withCredentials: true
+            });
+            
+            setMemberGpts(prev => prev.filter(gpt => gpt._id !== gptId));
+            toast.success('GPT unassigned successfully');
+        } catch (error) {
+            console.error("Error removing GPT assignment:", error);
+            toast.error('Failed to unassign GPT');
+        }
+    };
+
+    // Add this function to handle assigning GPTs
+    const handleAssignGpts = () => {
+        setShowAssignGptsModal(true);
+    };
 
     if (!isOpen || !member) return null;
 
-    // Calculate stats
-    const memberSince = member.joined;
-    const lastActive = member.lastActive;
-    const totalAssignedGPTs = member.assignedGPTs;
+    // Format date for display
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
+    // Format relative time
+    const formatRelativeTime = (dateString) => {
+        if (!dateString) return 'N/A';
+        
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffInSeconds = Math.floor((now - date) / 1000);
+        
+        if (diffInSeconds < 60) return 'Just now';
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+        if (diffInSeconds < 172800) return 'Yesterday';
+        
+        return formatDate(dateString);
+    };
 
     // Tab content components
     const renderProfileTab = () => (
@@ -32,7 +207,7 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
                 </div>
                 <div>
                     <h2 className="text-xl font-semibold text-white">{member.name}</h2>
-                    <p className="text-gray-400">{member.position}</p>
+                    <p className="text-gray-400">{member.position || 'No position set'}</p>
                 </div>
             </div>
 
@@ -54,7 +229,7 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
                         </div>
                         <div>
                             <p className="text-xs text-gray-400">Position</p>
-                            <p className="text-sm text-white">{member.position}</p>
+                            <p className="text-sm text-white">{member.position || 'Not set'}</p>
                         </div>
                     </div>
                 </div>
@@ -101,8 +276,8 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
                         <p className="text-sm font-medium text-white">{member.assignedGPTs}</p>
                     </div>
                     <div className="bg-gray-800 rounded p-3">
-                        <p className="text-xs text-gray-400">Usage Time</p>
-                        <p className="text-sm font-medium text-white">24 hours</p>
+                        <p className="text-xs text-gray-400">Member Since</p>
+                        <p className="text-sm font-medium text-white">{member.joined}</p>
                     </div>
                 </div>
             </div>
@@ -110,42 +285,46 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
     );
 
     const renderAssignedGptsTab = () => {
-        const handleRemoveGpt = (gptId) => {
-            console.log("Removing GPT with ID:", gptId);
-        };
-
         return (
             <div className="py-4">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium text-white">Assigned GPTs ({member.assignedGPTs})</h3>
+                    <h3 className="text-lg font-medium text-white">Assigned GPTs ({memberGpts.length})</h3>
                     <button 
                         className="bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md px-3 py-1.5 flex items-center"
+                        onClick={handleAssignGpts}
                     >
                         <FiBox className="mr-1.5" size={14} />
                         Assign GPTs
                     </button>
                 </div>
 
-                {member.assignedGPTs > 0 ? (
+                {loading.gpts ? (
+                    <div className="flex justify-center py-10">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                    </div>
+                ) : memberGpts.length > 0 ? (
                     <div className="space-y-3">
-                        {/* This is a placeholder - in a real app, you would map through actual assigned GPTs */}
-                        {Array.from({ length: 3 }).map((_, index) => (
-                            <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-gray-700/50 border border-gray-600">
+                        {memberGpts.map((gpt) => (
+                            <div key={gpt._id} className="flex items-center justify-between p-3 rounded-lg bg-gray-700/50 border border-gray-600">
                                 <div className="flex items-center">
                                     <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center mr-3">
-                                        <span className="text-lg text-white">G</span>
+                                        {gpt.imageUrl ? (
+                                            <img src={gpt.imageUrl} alt={gpt.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <span className="text-lg text-white">{gpt.name.charAt(0)}</span>
+                                        )}
                                     </div>
                                     <div>
-                                        <h4 className="font-medium text-white">GPT Assistant {index + 1}</h4>
-                                        <p className="text-xs text-gray-400">AI assistant with specialized knowledge</p>
+                                        <h4 className="font-medium text-white">{gpt.name}</h4>
+                                        <p className="text-xs text-gray-400">{gpt.description}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center">
                                     <div className="text-xs text-gray-400 mr-4">
-                                        Assigned: 2 weeks ago
+                                        Assigned: {formatRelativeTime(gpt.assignedAt)}
                                     </div>
                                     <button 
-                                        onClick={() => handleRemoveGpt(`gpt-${index+1}`)}
+                                        onClick={() => handleRemoveGpt(gpt._id)}
                                         className="text-red-400 hover:text-red-300 p-1.5 hover:bg-gray-600 rounded-full transition-colors"
                                         title="Remove GPT"
                                     >
@@ -159,7 +338,10 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
                     <div className="text-center py-10 bg-gray-800 rounded-lg border border-gray-700">
                         <FiBox className="mx-auto text-gray-500" size={32} />
                         <p className="mt-2 text-gray-400">No GPTs assigned yet</p>
-                        <button className="mt-4 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md px-4 py-2">
+                        <button 
+                            className="mt-4 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md px-4 py-2"
+                            onClick={handleAssignGpts}
+                        >
                             Assign First GPT
                         </button>
                     </div>
@@ -172,33 +354,50 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
         <div className="py-4">
             <h3 className="text-lg font-medium text-white mb-4">Recent Activity</h3>
             
-            <div className="space-y-4">
-                <div className="relative">
-                    <div className="absolute top-0 bottom-0 left-2.5 w-0.5 bg-gray-700" />
-                    
-                    {[1, 2, 3, 4].map((item, index) => (
-                        <div key={index} className="flex items-start mb-4 relative">
-                            <div className="absolute left-0 mt-1.5">
-                                <div className="h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center ring-4 ring-gray-800 z-10">
-                                    <FiMessageSquare size={12} className="text-white" />
-                                </div>
-                            </div>
-                            
-                            <div className="ml-10">
-                                <div className="bg-gray-700/50 rounded-lg p-3 border border-gray-600">
-                                    <p className="text-sm text-white">Used <span className="font-medium">Customer Support Assistant</span> GPT</p>
-                                    <p className="text-xs text-gray-400 mt-1">Created 14 messages in conversation</p>
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1">
-                                    {index === 0 ? 'Today, 10:42 AM' : 
-                                     index === 1 ? 'Yesterday, 3:30 PM' : 
-                                     index === 2 ? 'Mar 28, 2023' : 'Mar 25, 2023'}
-                                </div>
-                            </div>
-                        </div>
-                    ))}
+            {loading.activity ? (
+                <div className="flex justify-center py-10">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
-            </div>
+            ) : userActivity.length > 0 ? (
+                <div className="space-y-4">
+                    <div className="relative">
+                        <div className="absolute top-0 bottom-0 left-2.5 w-0.5 bg-gray-700" />
+                        
+                        {userActivity.map((activity, index) => (
+                            <div key={index} className="flex items-start mb-4 relative">
+                                <div className="absolute left-0 mt-1.5">
+                                    <div className="h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center ring-4 ring-gray-800 z-10">
+                                        <FiMessageSquare size={12} className="text-white" />
+                                    </div>
+                                </div>
+                                
+                                <div className="ml-10">
+                                    <div className="bg-gray-700/50 rounded-lg p-3 border border-gray-600">
+                                        {activity.type === 'gpt_usage' ? (
+                                            <>
+                                                <p className="text-sm text-white">Used <span className="font-medium">{activity.gptName}</span> GPT</p>
+                                                <p className="text-xs text-gray-400 mt-1">Created {activity.messages} messages in conversation</p>
+                                            </>
+                                        ) : activity.type === 'login' ? (
+                                            <p className="text-sm text-white">Logged into the platform</p>
+                                        ) : (
+                                            <p className="text-sm text-white">{activity.description || 'Unknown activity'}</p>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                        {formatRelativeTime(activity.date)}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <div className="text-center py-10 bg-gray-800 rounded-lg border border-gray-700">
+                    <FiActivity className="mx-auto text-gray-500" size={32} />
+                    <p className="mt-2 text-gray-400">No activity recorded yet</p>
+                </div>
+            )}
         </div>
     );
 
@@ -206,34 +405,55 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
         <div className="py-4">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-white">Notes</h3>
-                <button className="text-blue-400 hover:text-blue-300 text-sm">+ Add Note</button>
             </div>
             
             <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600 mb-4">
                 <textarea 
                     className="w-full bg-gray-800 border border-gray-600 rounded-md p-3 text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 h-24"
                     placeholder="Add notes about this team member..."
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
                 ></textarea>
                 <div className="flex justify-end mt-2">
-                    <button className="bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md px-4 py-2">
+                    <button 
+                        onClick={handleAddNote}
+                        disabled={!noteText.trim()}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                         Save Note
                     </button>
                 </div>
             </div>
             
-            <div className="space-y-4">
-                <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                    <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                            <p className="text-sm text-white">Completed onboarding process, assigned initial GPTs for marketing tasks.</p>
-                            <p className="text-xs text-gray-400 mt-2">Added by Admin User • Mar 20, 2023</p>
-                        </div>
-                        <button className="text-gray-500 hover:text-gray-400">
-                            <IoClose size={18} />
-                        </button>
-                    </div>
+            {loading.notes ? (
+                <div className="flex justify-center py-10">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
-            </div>
+            ) : userNotes.length > 0 ? (
+                <div className="space-y-4">
+                    {userNotes.map((note) => (
+                        <div key={note.id} className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                            <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                    <p className="text-sm text-white">{note.text}</p>
+                                    <p className="text-xs text-gray-400 mt-2">Added by {note.createdBy} • {formatDate(note.createdAt)}</p>
+                                </div>
+                                <button 
+                                    className="text-gray-500 hover:text-gray-400"
+                                    onClick={() => handleRemoveNote(note.id)}
+                                >
+                                    <IoClose size={18} />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-10 bg-gray-800 rounded-lg border border-gray-700">
+                    <FiMessageSquare className="mx-auto text-gray-500" size={32} />
+                    <p className="mt-2 text-gray-400">No notes added yet</p>
+                </div>
+            )}
         </div>
     );
 
@@ -322,6 +542,38 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
                     </button>
                 </div>
             </div>
+
+            {showAssignGptsModal && (
+                <AssignGptsModal 
+                    isOpen={showAssignGptsModal}
+                    onClose={() => {
+                        setShowAssignGptsModal(false);
+                        // Refresh the GPTs list after assignment
+                        if (member) {
+                            const fetchAssignedGpts = async () => {
+                                setLoading(prev => ({ ...prev, gpts: true }));
+                                try {
+                                    const response = await axiosInstance.get(`/api/custom-gpts/team/members/${member.id}/gpts`, {
+                                        withCredentials: true
+                                    });
+                                    
+                                    if (response.data && response.data.gpts) {
+                                        setMemberGpts(response.data.gpts);
+                                    }
+                                } catch (error) {
+                                    console.error("Error fetching assigned GPTs:", error);
+                                    toast.error("Could not load assigned GPTs");
+                                } finally {
+                                    setLoading(prev => ({ ...prev, gpts: false }));
+                                }
+                            };
+                            
+                            fetchAssignedGpts();
+                        }
+                    }}
+                    teamMember={member}
+                />
+            )}
         </div>
     );
 };

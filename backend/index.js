@@ -5,6 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const passport = require('passport');
+const compression = require('compression');
 const connectDB = require('./lib/db');
 const customGptRoutes = require('./routes/customGptRoutes');
 const authRoutes = require('./routes/authRoutes');
@@ -13,6 +14,8 @@ const invitationRoutes = require('./routes/invitationRoutes');
 require('./config/passport');
 
 const app = express();
+
+app.use(compression());
 
 app.use(express.json());
 app.use(cookieParser());

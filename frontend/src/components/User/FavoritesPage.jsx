@@ -1,9 +1,39 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { FiSearch, FiMessageSquare, FiStar, FiHeart, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { axiosInstance } from '../../api/axiosInstance';
 
+// Mock data moved outside component to prevent recreation on each render
+const mockFavorites = [
+    {
+        _id: 'fav1',
+        name: 'Customer Support Assistant',
+        description: 'Handles customer inquiries and provides helpful responses for common questions.',
+        model: 'GPT-4',
+        imageUrl: null,
+        createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        capabilities: { webBrowsing: true }
+    },
+    {
+        _id: 'fav2',
+        name: 'Product Recommendation Agent',
+        description: 'Analyzes user preferences and suggests personalized product recommendations.',
+        model: 'GPT-3.5',
+        imageUrl: null,
+        createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
+        capabilities: { webBrowsing: false }
+    },
+    {
+        _id: 'fav3',
+        name: 'Content Writing Assistant',
+        description: 'Helps generate blog posts, marketing copy, and other content materials.',
+        model: 'GPT-4',
+        imageUrl: null,
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+        capabilities: { webBrowsing: true }
+    }
+];
 
 const FavoritesPage = () => {
     const [favoriteGpts, setFavoriteGpts] = useState([]);
@@ -19,45 +49,9 @@ const FavoritesPage = () => {
         const fetchFavoriteGpts = async () => {
             try {
                 setLoading(true);
-                // This would be a real API endpoint in production
-                // For now we'll use mock data
-                
-                // Mock data for demonstration
-                const mockFavorites = [
-                    {
-                        _id: 'fav1',
-                        name: 'Customer Support Assistant',
-                        description: 'Handles customer inquiries and provides helpful responses for common questions.',
-                        model: 'GPT-4',
-                        imageUrl: null,
-                        createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-                        capabilities: { webBrowsing: true }
-                    },
-                    {
-                        _id: 'fav2',
-                        name: 'Product Recommendation Agent',
-                        description: 'Analyzes user preferences and suggests personalized product recommendations.',
-                        model: 'GPT-3.5',
-                        imageUrl: null,
-                        createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-                        capabilities: { webBrowsing: false }
-                    },
-                    {
-                        _id: 'fav3',
-                        name: 'Content Writing Assistant',
-                        description: 'Helps generate blog posts, marketing copy, and other content materials.',
-                        model: 'GPT-4',
-                        imageUrl: null,
-                        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-                        capabilities: { webBrowsing: true }
-                    }
-                ];
-                
-                setTimeout(() => {
-                    setFavoriteGpts(mockFavorites);
-                    setLoading(false);
-                }, 800);
-                
+                // Removed artificial timeout delay - load data immediately
+                setFavoriteGpts(mockFavorites);
+                setLoading(false);
             } catch (error) {
                 console.error("Error fetching favorite GPTs:", error);
                 setError("Failed to load your favorite GPTs");
@@ -68,63 +62,80 @@ const FavoritesPage = () => {
         fetchFavoriteGpts();
     }, []);
 
+    // Memoized click outside handler to improve performance
+    const handleClickOutside = useCallback((event) => {
+        if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
+            setShowSortOptions(false);
+        }
+    }, []);
+
     // Close sort dropdown when clicking outside
     useEffect(() => {
-        function handleClickOutside(event) {
-            if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
-                setShowSortOptions(false);
-            }
-        }
         document.addEventListener("mousedown", handleClickOutside);
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
         };
-    }, [sortDropdownRef]);
+    }, [handleClickOutside]);
     
-    // Filter and sort GPTs
-    const filteredGpts = favoriteGpts
-        .filter(gpt => 
-            gpt.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (gpt.description && gpt.description.toLowerCase().includes(searchTerm.toLowerCase()))
-        )
-        .sort((a, b) => {
-            switch (sortOption) {
-                case 'newest':
-                    return new Date(b.createdAt || Date.now()) - new Date(a.createdAt || Date.now());
-                case 'oldest':
-                    return new Date(a.createdAt || Date.now()) - new Date(b.createdAt || Date.now());
-                case 'alphabetical':
-                    return a.name.localeCompare(b.name);
-                default:
-                    return new Date(b.createdAt || Date.now()) - new Date(a.createdAt || Date.now());
-            }
-        });
+    // Memoized filtered and sorted GPTs
+    const filteredGpts = useMemo(() => {
+        return favoriteGpts
+            .filter(gpt => 
+                gpt.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (gpt.description && gpt.description.toLowerCase().includes(searchTerm.toLowerCase()))
+            )
+            .sort((a, b) => {
+                switch (sortOption) {
+                    case 'newest':
+                        return new Date(b.createdAt || Date.now()) - new Date(a.createdAt || Date.now());
+                    case 'oldest':
+                        return new Date(a.createdAt || Date.now()) - new Date(b.createdAt || Date.now());
+                    case 'alphabetical':
+                        return a.name.localeCompare(b.name);
+                    default:
+                        return new Date(b.createdAt || Date.now()) - new Date(a.createdAt || Date.now());
+                }
+            });
+    }, [favoriteGpts, searchTerm, sortOption]);
     
-    const formatDate = (dateString) => {
+    const formatDate = useCallback((dateString) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
             day: 'numeric'
         });
-    };
+    }, []);
 
-    const handleChatClick = (gptId, e) => {
-        e.stopPropagation(); // Prevent the card click event
+    const handleChatClick = useCallback((gptId, e) => {
+        e.stopPropagation();
         navigate(`/user?gptId=${gptId}`);
-    };
+    }, [navigate]);
     
-    const handleRemoveFavorite = (gptId, e) => {
+    const handleRemoveFavorite = useCallback((gptId, e) => {
         e.stopPropagation();
         e.preventDefault();
-        // In a real app, you would call an API to remove from favorites
         setFavoriteGpts(prev => prev.filter(gpt => gpt._id !== gptId));
-    };
+    }, []);
     
+    const handleSearchChange = useCallback((e) => {
+        setSearchTerm(e.target.value);
+    }, []);
+    
+    const toggleSortOptions = useCallback(() => {
+        setShowSortOptions(prev => !prev);
+    }, []);
+    
+    const selectSortOption = useCallback((option) => {
+        setSortOption(option);
+        setShowSortOptions(false);
+    }, []);
+
+    // Loading indicator with reduced complexity
     if (loading && favoriteGpts.length === 0) {
         return (
             <div className="flex items-center justify-center h-full text-white">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
             </div>
         );
     }
@@ -143,14 +154,14 @@ const FavoritesPage = () => {
                         type="text"
                         placeholder="Search favorites..."
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={handleSearchChange}
                         className="w-full sm:w-52 md:w-64 pl-10 pr-4 py-2 rounded-lg bg-gray-700 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm"
                     />
                 </div>
                 
                 <div className="relative" ref={sortDropdownRef}>
                     <button 
-                        onClick={() => setShowSortOptions(!showSortOptions)}
+                        onClick={toggleSortOptions}
                         className="flex items-center justify-between w-full sm:w-36 px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white text-sm"
                     >
                         <span className="truncate">Sort: {sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}</span>
@@ -161,19 +172,19 @@ const FavoritesPage = () => {
                         <div className="absolute z-10 w-full sm:w-36 mt-1 bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden text-sm">
                             <button 
                                 className={`block w-full text-left px-3 py-2 hover:bg-gray-700 transition-colors ${sortOption === 'newest' ? 'bg-blue-600' : ''}`}
-                                onClick={() => {setSortOption('newest'); setShowSortOptions(false);}}
+                                onClick={() => selectSortOption('newest')}
                             >
                                 Newest
                             </button>
                             <button 
                                 className={`block w-full text-left px-3 py-2 hover:bg-gray-700 transition-colors ${sortOption === 'oldest' ? 'bg-blue-600' : ''}`}
-                                onClick={() => {setSortOption('oldest'); setShowSortOptions(false);}}
+                                onClick={() => selectSortOption('oldest')}
                             >
                                 Oldest
                             </button>
                             <button 
                                 className={`block w-full text-left px-3 py-2 hover:bg-gray-700 transition-colors ${sortOption === 'alphabetical' ? 'bg-blue-600' : ''}`}
-                                onClick={() => {setSortOption('alphabetical'); setShowSortOptions(false);}}
+                                onClick={() => selectSortOption('alphabetical')}
                             >
                                 Alphabetical
                             </button>
@@ -224,6 +235,7 @@ const FavoritesPage = () => {
                                             src={gpt.imageUrl} 
                                             alt={gpt.name} 
                                             className="w-full h-full object-cover opacity-70"
+                                            loading="lazy"
                                         />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-900/50 to-blue-900/50">
@@ -231,7 +243,6 @@ const FavoritesPage = () => {
                                         </div>
                                     )}
                                     
-                                    {/* Favorite button */}
                                     <button
                                         onClick={(e) => handleRemoveFavorite(gpt._id, e)}
                                         className="absolute top-2 right-2 p-1.5 rounded-full bg-black/30 hover:bg-black/50 text-yellow-400 transition-all"
@@ -277,4 +288,4 @@ const FavoritesPage = () => {
     );
 };
 
-export default FavoritesPage; 
+export default React.memo(FavoritesPage); 

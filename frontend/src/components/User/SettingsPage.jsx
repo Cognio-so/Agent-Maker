@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { 
   FiUser, FiBell, FiMonitor, FiLock, FiChevronRight, 
@@ -8,103 +8,8 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
-const SettingsPage = () => {
-  const { user } = useAuth();
-  const [activeSection, setActiveSection] = useState('account');
-  const [notification, setNotification] = useState({ type: '', message: '' });
-  const [formData, setFormData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    profileImage: user?.profilePic || null,
-    darkMode: true,
-    emailNotifications: true,
-    securityAlerts: true,
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
-
-  useEffect(() => {
-    if (user) {
-      setFormData(prev => ({
-        ...prev,
-        name: user.name || '',
-        email: user.email || '',
-        profileImage: user.profilePic || null
-      }));
-    }
-  }, [user]);
-
-  const showNotification = (type, message) => {
-    setNotification({ type, message });
-    setTimeout(() => {
-      setNotification({ type: '', message: '' });
-    }, 3000);
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // In a real app, upload to server
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({
-          ...prev,
-          profileImage: reader.result
-        }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handlePasswordChange = async (e) => {
-    e.preventDefault();
-    
-    if (formData.newPassword !== formData.confirmPassword) {
-      showNotification('error', 'New passwords do not match');
-      return;
-    }
-
-    // Simulate API call
-    setTimeout(() => {
-      showNotification('success', 'Password updated successfully');
-      setFormData(prev => ({
-        ...prev,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      }));
-    }, 800);
-  };
-
-  const handleAccountUpdate = async (e) => {
-    e.preventDefault();
-    
-    // Simulate API call
-    setTimeout(() => {
-      showNotification('success', 'Account information updated successfully');
-    }, 800);
-  };
-
-  const handlePreferencesUpdate = async (e) => {
-    e.preventDefault();
-    
-    // Simulate API call
-    setTimeout(() => {
-      showNotification('success', 'Preferences updated successfully');
-    }, 800);
-  };
-
-  // Account settings section
-  const renderAccountSettings = () => (
+// Account settings section component
+const AccountSettings = memo(({ formData, handleInputChange, handleAccountUpdate, handlePasswordChange, handleImageUpload }) => (
     <div className="animate-fadeIn">
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-1">Account Information</h2>
@@ -225,10 +130,10 @@ const SettingsPage = () => {
         </form>
       </div>
     </div>
-  );
+));
 
-  // Preferences section
-  const renderPreferences = () => (
+// Preferences section component
+const PreferencesSettings = memo(({ formData, handleInputChange, handlePreferencesUpdate }) => (
     <div className="animate-fadeIn">
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-1">Appearance</h2>
@@ -368,8 +273,121 @@ const SettingsPage = () => {
           Save Preferences
         </button>
       </form>
+  </div>
+));
+
+// Notification component
+const Notification = memo(({ type, message }) => {
+  if (!message) return null;
+  
+  return (
+    <div className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-lg shadow-lg transition-all transform animate-slideIn ${
+      type === 'success' ? 'bg-green-900/70 text-green-200 border border-green-700' : 
+      'bg-red-900/70 text-red-200 border border-red-700'
+    }`}>
+      {type === 'success' ? 
+        <FiCheck className="inline-block mr-2" /> : 
+        <FiInfo className="inline-block mr-2" />
+      }
+      {message}
     </div>
   );
+});
+
+const SettingsPage = () => {
+  const { user } = useAuth();
+  const [activeSection, setActiveSection] = useState('account');
+  const [notification, setNotification] = useState({ type: '', message: '' });
+  const [formData, setFormData] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    profileImage: user?.profilePic || null,
+    darkMode: true,
+    emailNotifications: true,
+    securityAlerts: true,
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+    fontSize: 'medium',
+    compactView: false
+  });
+
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        name: user.name || '',
+        email: user.email || '',
+        profileImage: user.profilePic || null
+      }));
+    }
+  }, [user]);
+
+  const showNotification = useCallback((type, message) => {
+    setNotification({ type, message });
+    setTimeout(() => {
+      setNotification({ type: '', message: '' });
+    }, 3000);
+  }, []);
+
+  const handleInputChange = useCallback((e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  }, []);
+
+  const handleImageUpload = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // In a real app, upload to server
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({
+          ...prev,
+          profileImage: reader.result
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  }, []);
+
+  const handlePasswordChange = useCallback(async (e) => {
+    e.preventDefault();
+    
+    if (formData.newPassword !== formData.confirmPassword) {
+      showNotification('error', 'New passwords do not match');
+      return;
+    }
+
+    // Simulate API call - removed delay
+    showNotification('success', 'Password updated successfully');
+    setFormData(prev => ({
+      ...prev,
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    }));
+  }, [formData.newPassword, formData.confirmPassword, showNotification]);
+
+  const handleAccountUpdate = useCallback(async (e) => {
+    e.preventDefault();
+    
+    // Simulate API call - removed delay
+    showNotification('success', 'Account information updated successfully');
+  }, [showNotification]);
+
+  const handlePreferencesUpdate = useCallback(async (e) => {
+    e.preventDefault();
+    
+    // Simulate API call - removed delay
+    showNotification('success', 'Preferences updated successfully');
+  }, [showNotification]);
+  
+  const setSection = useCallback((section) => {
+    setActiveSection(section);
+  }, []);
 
   return (
     <div className="flex flex-col h-full bg-black text-white overflow-hidden">
@@ -379,25 +397,14 @@ const SettingsPage = () => {
       </div>
       
       {/* Notification */}
-      {notification.message && (
-        <div className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-lg shadow-lg transition-all transform animate-slideIn ${
-          notification.type === 'success' ? 'bg-green-900/70 text-green-200 border border-green-700' : 
-          'bg-red-900/70 text-red-200 border border-red-700'
-        }`}>
-          {notification.type === 'success' ? 
-            <FiCheck className="inline-block mr-2" /> : 
-            <FiInfo className="inline-block mr-2" />
-          }
-          {notification.message}
-        </div>
-      )}
+      <Notification type={notification.type} message={notification.message} />
       
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
         {/* Left sidebar */}
         <div className="w-full md:w-60 lg:w-72 bg-gray-900 p-5 border-b md:border-b-0 md:border-r border-gray-800 flex-shrink-0">
           <nav className="space-y-1">
             <button
-              onClick={() => setActiveSection('account')}
+              onClick={() => setSection('account')}
               className={`flex items-center justify-between w-full px-4 py-3 rounded-lg transition-colors ${
                 activeSection === 'account' ? 'bg-blue-600' : 'hover:bg-gray-800'
               }`}
@@ -410,7 +417,7 @@ const SettingsPage = () => {
             </button>
             
             <button
-              onClick={() => setActiveSection('preferences')}
+              onClick={() => setSection('preferences')}
               className={`flex items-center justify-between w-full px-4 py-3 rounded-lg transition-colors ${
                 activeSection === 'preferences' ? 'bg-blue-600' : 'hover:bg-gray-800'
               }`}
@@ -434,11 +441,25 @@ const SettingsPage = () => {
         
         {/* Main content */}
         <div className="flex-1 p-5 md:p-8 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {activeSection === 'account' ? renderAccountSettings() : renderPreferences()}
+          {activeSection === 'account' ? (
+            <AccountSettings 
+              formData={formData}
+              handleInputChange={handleInputChange}
+              handleAccountUpdate={handleAccountUpdate}
+              handlePasswordChange={handlePasswordChange}
+              handleImageUpload={handleImageUpload}
+            />
+          ) : (
+            <PreferencesSettings 
+              formData={formData}
+              handleInputChange={handleInputChange} 
+              handlePreferencesUpdate={handlePreferencesUpdate}
+            />
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-export default SettingsPage; 
+export default memo(SettingsPage); 

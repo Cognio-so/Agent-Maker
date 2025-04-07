@@ -1,11 +1,61 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { FiSearch, FiMessageSquare, FiClock, FiCalendar, FiTrash2 } from 'react-icons/fi';
 import { IoEllipse } from 'react-icons/io5';
 import { useNavigate } from 'react-router-dom';
 
-// API URL from environment variables
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+// Mock data moved outside component to prevent recreation on each render
+const mockConversations = [
+    {
+        id: 'conv1',
+        gptId: 'gpt1',
+        gptName: 'Customer Support Assistant',
+        lastMessage: 'How can I request a refund for my recent purchase?',
+        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        messageCount: 12,
+        model: 'GPT-4',
+        summary: 'Discussion about refund policies and procedures'
+    },
+    {
+        id: 'conv2',
+        gptId: 'gpt2',
+        gptName: 'Product Recommendation Agent',
+        lastMessage: 'I need a new laptop for video editing under $1500',
+        timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+        messageCount: 8,
+        model: 'GPT-3.5',
+        summary: 'Recommendations for video editing laptops'
+    },
+    {
+        id: 'conv3',
+        gptId: 'gpt3',
+        gptName: 'Content Writing Assistant',
+        lastMessage: 'Can you help me write a blog post about artificial intelligence?',
+        timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 1 week ago
+        messageCount: 15,
+        model: 'GPT-4',
+        summary: 'Creating a blog post about AI advancements'
+    },
+    {
+        id: 'conv4',
+        gptId: 'gpt4',
+        gptName: 'Travel Planning Assistant',
+        lastMessage: 'I want to plan a 2-week trip to Japan in the spring',
+        timestamp: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), // 2 weeks ago
+        messageCount: 22,
+        model: 'GPT-4',
+        summary: 'Planning a comprehensive trip to Japan'
+    },
+    {
+        id: 'conv5',
+        gptId: 'gpt5',
+        gptName: 'Health & Fitness Coach',
+        lastMessage: 'What exercises are best for improving core strength?',
+        timestamp: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 1 month ago
+        messageCount: 7,
+        model: 'GPT-3.5',
+        summary: 'Discussion about core strength exercises'
+    }
+];
 
 const HistoryPage = () => {
     const [conversations, setConversations] = useState([]);
@@ -21,67 +71,9 @@ const HistoryPage = () => {
         const fetchConversationHistory = async () => {
             try {
                 setLoading(true);
-                // In a real app, fetch actual conversation history
-                // For now using mock data
-                
-                const mockConversations = [
-                    {
-                        id: 'conv1',
-                        gptId: 'gpt1',
-                        gptName: 'Customer Support Assistant',
-                        lastMessage: 'How can I request a refund for my recent purchase?',
-                        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-                        messageCount: 12,
-                        model: 'GPT-4',
-                        summary: 'Discussion about refund policies and procedures'
-                    },
-                    {
-                        id: 'conv2',
-                        gptId: 'gpt2',
-                        gptName: 'Product Recommendation Agent',
-                        lastMessage: 'I need a new laptop for video editing under $1500',
-                        timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-                        messageCount: 8,
-                        model: 'GPT-3.5',
-                        summary: 'Recommendations for video editing laptops'
-                    },
-                    {
-                        id: 'conv3',
-                        gptId: 'gpt3',
-                        gptName: 'Content Writing Assistant',
-                        lastMessage: 'Can you help me write a blog post about artificial intelligence?',
-                        timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 1 week ago
-                        messageCount: 15,
-                        model: 'GPT-4',
-                        summary: 'Creating a blog post about AI advancements'
-                    },
-                    {
-                        id: 'conv4',
-                        gptId: 'gpt4',
-                        gptName: 'Travel Planning Assistant',
-                        lastMessage: 'I want to plan a 2-week trip to Japan in the spring',
-                        timestamp: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), // 2 weeks ago
-                        messageCount: 22,
-                        model: 'GPT-4',
-                        summary: 'Planning a comprehensive trip to Japan'
-                    },
-                    {
-                        id: 'conv5',
-                        gptId: 'gpt5',
-                        gptName: 'Health & Fitness Coach',
-                        lastMessage: 'What exercises are best for improving core strength?',
-                        timestamp: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 1 month ago
-                        messageCount: 7,
-                        model: 'GPT-3.5',
-                        summary: 'Discussion about core strength exercises'
-                    }
-                ];
-                
-                setTimeout(() => {
-                    setConversations(mockConversations);
-                    setLoading(false);
-                }, 800);
-                
+                // Removed artificial timeout delay - load data immediately
+                setConversations(mockConversations);
+                setLoading(false);
             } catch (error) {
                 console.error("Error fetching conversation history:", error);
                 setError("Failed to load your conversation history");
@@ -92,8 +84,8 @@ const HistoryPage = () => {
         fetchConversationHistory();
     }, []);
     
-    // Filter conversations based on search and time period
-    const getFilteredConversations = () => {
+    // Memoized filtered conversations based on search and time period
+    const filteredConversations = useMemo(() => {
         let filtered = [...conversations];
         
         // Apply search filter
@@ -130,11 +122,9 @@ const HistoryPage = () => {
         }
         
         return filtered;
-    };
+    }, [conversations, searchTerm, filterPeriod]);
     
-    const filteredConversations = getFilteredConversations();
-    
-    const formatTimestamp = (timestamp) => {
+    const formatTimestamp = useCallback((timestamp) => {
         const date = new Date(timestamp);
         const now = new Date();
         const diffMs = now - date;
@@ -150,37 +140,44 @@ const HistoryPage = () => {
         } else {
             return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
         }
-    };
+    }, []);
     
-    const handleContinueConversation = (conv) => {
-        // In a real app, this would navigate to the chat with the conversation history loaded
+    const handleContinueConversation = useCallback((conv) => {
         navigate(`/user?gptId=${conv.gptId}&conversationId=${conv.id}`);
-    };
+    }, [navigate]);
     
-    const confirmDeleteConversation = (conv, e) => {
+    const confirmDeleteConversation = useCallback((conv, e) => {
         e.stopPropagation();
         setSelectedConversation(conv);
         setShowDeleteConfirm(true);
-    };
+    }, []);
     
-    const handleDeleteConversation = () => {
+    const handleDeleteConversation = useCallback(() => {
         if (!selectedConversation) return;
         
-        // In a real app, call API to delete the conversation
         setConversations(prev => prev.filter(c => c.id !== selectedConversation.id));
         setShowDeleteConfirm(false);
         setSelectedConversation(null);
-    };
+    }, [selectedConversation]);
     
-    const cancelDelete = () => {
+    const cancelDelete = useCallback(() => {
         setShowDeleteConfirm(false);
         setSelectedConversation(null);
-    };
+    }, []);
     
+    const handleSearchChange = useCallback((e) => {
+        setSearchTerm(e.target.value);
+    }, []);
+    
+    const handleFilterChange = useCallback((e) => {
+        setFilterPeriod(e.target.value);
+    }, []);
+    
+    // Loading indicator with reduced complexity
     if (loading && conversations.length === 0) {
         return (
             <div className="flex items-center justify-center h-full text-white">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
             </div>
         );
     }
@@ -199,7 +196,7 @@ const HistoryPage = () => {
                         type="text"
                         placeholder="Search conversations..."
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={handleSearchChange}
                         className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-gray-700 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                     />
                 </div>
@@ -208,7 +205,7 @@ const HistoryPage = () => {
                     <FiCalendar className="text-gray-400" size={18} />
                     <select
                         value={filterPeriod}
-                        onChange={(e) => setFilterPeriod(e.target.value)}
+                        onChange={handleFilterChange}
                         className="bg-gray-700 border border-gray-600 text-white rounded-lg py-2 px-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                     >
                         <option value="all">All Time</option>
@@ -339,4 +336,4 @@ const HistoryPage = () => {
     );
 };
 
-export default HistoryPage; 
+export default React.memo(HistoryPage); 
