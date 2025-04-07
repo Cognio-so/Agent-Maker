@@ -22,7 +22,6 @@ const UserGptAssignmentSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Compound index to ensure a user can only be assigned a specific GPT once
 UserGptAssignmentSchema.index({ userId: 1, gptId: 1 }, { unique: true });
 
 module.exports = mongoose.model('UserGptAssignment', UserGptAssignmentSchema);

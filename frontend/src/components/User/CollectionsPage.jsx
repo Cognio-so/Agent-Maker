@@ -2,9 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { FiSearch, FiMessageSquare, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
+import { axiosInstance } from '../../api/axiosInstance';
 
-// API URL from environment variables
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 const CollectionsPage = () => {
     const [assignedGpts, setAssignedGpts] = useState([]);
@@ -20,7 +19,7 @@ const CollectionsPage = () => {
         const fetchAssignedGpts = async () => {
             try {
                 setLoading(true);
-                const response = await axios.get(`${API_URL}/api/custom-gpts/user/assigned`, {
+                const response = await axiosInstance.get(`/api/custom-gpts/user/assigned`, {
                     withCredentials: true
                 });
                 

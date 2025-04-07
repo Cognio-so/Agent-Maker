@@ -1,43 +1,27 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { FcGoogle } from 'react-icons/fc';
 import { useAuth } from '../context/AuthContext';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, loading, error, setError, googleAuth } = useAuth();
-  const googleButtonRef = useRef(null);
+  const { login, loading, error, setError, googleAuthInitiate } = useAuth();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     setError(null);
-  }, [setError]);
-
-  useEffect(() => {
-    // Initialize Google One Tap
-    if (window.google && googleButtonRef.current) {
-      window.google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-        callback: googleAuth,
-        auto_select: false,
-      });
-
-      window.google.accounts.id.renderButton(
-        googleButtonRef.current,
-        { 
-          type: 'standard', 
-          theme: 'outline', 
-          size: 'large',
-          text: 'signin_with',
-          width: '100%'
-        }
-      );
+    const errorParam = searchParams.get('error');
+    if (errorParam) {
+      setError(`Login failed: ${errorParam.replace(/_/g, ' ')}`);
     }
-  }, [googleAuth]);
+    const signupParam = searchParams.get('signup');
+    if (signupParam === 'success') {
+    }
+  }, [setError, searchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
     await login(email, password);
   };
 
@@ -49,8 +33,8 @@ const LoginPage = () => {
         <div className="relative z-10 text-white px-12 max-w-lg">
           <h1 className="text-4xl font-bold mb-6">AI-Powered Experience</h1>
           <p className="text-lg opacity-90 mb-8">
-            Access your intelligent assistant and unlock the power of advanced AI. 
-            Let our cutting-edge algorithms transform your workflow and elevate your 
+            Access your intelligent assistant and unlock the power of advanced AI.
+            Let our cutting-edge algorithms transform your workflow and elevate your
             productivity to unprecedented levels.
           </p>
           <div className="flex items-center space-x-3">
@@ -68,7 +52,7 @@ const LoginPage = () => {
           </div>
 
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">
               {error}
             </div>
           )}
@@ -88,7 +72,7 @@ const LoginPage = () => {
                 required
               />
             </div>
-            
+
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
@@ -116,26 +100,27 @@ const LoginPage = () => {
             >
               {loading ? 'Signing In...' : 'Sign In'}
             </button>
-            
+
             <div className="flex items-center my-4">
               <div className="flex-1 h-px bg-gray-300"></div>
               <p className="mx-4 text-sm text-gray-500">or</p>
               <div className="flex-1 h-px bg-gray-300"></div>
             </div>
-            
+
             <div className="">
               <button
-              type="button"
-              onClick={googleAuth}
-              className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
-            >
-              <FcGoogle size={20} />
-              Sign in with Google
-            </button>
+                type="button"
+                onClick={googleAuthInitiate}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+              >
+                <FcGoogle size={20} />
+                Sign in with Google
+              </button>
             </div>
 
           </form>
-          
+
           <p className="text-center mt-8 text-gray-600">
             Don't have an account?{' '}
             <Link to="/signup" className="text-black font-medium hover:underline">

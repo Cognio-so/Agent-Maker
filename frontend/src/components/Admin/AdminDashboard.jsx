@@ -4,12 +4,11 @@ import CreateCustomGpt from './CreateCustomGpt';
 import { FiSearch, FiChevronDown, FiChevronUp, FiGrid, FiList, FiMenu } from 'react-icons/fi';
 import AgentCard from './AgentCard';
 import CategorySection from './CategorySection';
-import axios from 'axios';
+import { axiosInstance } from '../../api/axiosInstance';
+
 
 // Default image for agents without images
 
-// API URL from environment variables
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 const AdminDashboard = ({ userName = "Admin User" }) => {
     const [showCreateGpt, setShowCreateGpt] = useState(false);
@@ -29,23 +28,22 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
         entertainment: []
     });
     const [gptCreated, setGptCreated] = useState(false);
-    
+
     // Fetch agents data from the backend
     useEffect(() => {
         const fetchAgents = async () => {
             try {
                 setLoading(true);
-                console.log("Fetching from:", `${API_URL}/api/custom-gpts`); // Debug log
-                const response = await axios.get(`${API_URL}/api/custom-gpts`, { 
-                    withCredentials: true 
+                const response = await axiosInstance.get(`/api/custom-gpts`, {
+                    withCredentials: true
                 });
-                
+
                 if (response.data.success && response.data.customGpts) {
                     // Sort by creation date (newest first)
-                    const sortedGpts = [...response.data.customGpts].sort((a, b) => 
+                    const sortedGpts = [...response.data.customGpts].sort((a, b) =>
                         new Date(b.createdAt) - new Date(a.createdAt)
                     );
-                    
+
                     // Categorize GPTs based on their description or name
                     const categorizedData = {
                         featured: [],
@@ -53,7 +51,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                         education: [],
                         entertainment: []
                     };
-                    
+
                     // Take the 4 most recent for featured
                     categorizedData.featured = sortedGpts.slice(0, 4).map(gpt => ({
                         id: gpt._id,
@@ -64,7 +62,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                         messageCount: Math.floor(Math.random() * 400) + 50,
                         modelType: gpt.model
                     }));
-                    
+
                     // Categorize the rest based on keywords in description or name
                     sortedGpts.forEach(gpt => {
                         const text = (gpt.description + ' ' + gpt.name).toLowerCase();
@@ -77,12 +75,12 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                             messageCount: Math.floor(Math.random() * 400) + 50,
                             modelType: gpt.model
                         };
-                        
+
                         // Skip if already in featured
                         if (categorizedData.featured.some(a => a.name === gpt.name)) {
                             return;
                         }
-                        
+
                         if (text.includes('work') || text.includes('task') || text.includes('productivity')) {
                             categorizedData.productivity.push(agent);
                         } else if (text.includes('learn') || text.includes('study') || text.includes('education')) {
@@ -96,21 +94,20 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                             categorizedData[randomCategory].push(agent);
                         }
                     });
-                    
+
                     setAgentsData(categorizedData);
                 }
             } catch (err) {
                 console.error("Error fetching agents:", err);
-                console.log("Full error details:", err.response?.data || err.message); // More detailed logging
                 setError("Failed to load agents data");
             } finally {
                 setLoading(false);
             }
         };
-        
+
         fetchAgents();
     }, [gptCreated]);
-    
+
     // Handle window resize
     useEffect(() => {
         const handleResize = () => {
@@ -130,7 +127,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
         const searchTermLower = searchTerm.toLowerCase();
         const filtered = {};
         Object.keys(agentsData).forEach(category => {
-            filtered[category] = agentsData[category].filter(agent => 
+            filtered[category] = agentsData[category].filter(agent =>
                 agent.name.toLowerCase().includes(searchTermLower) ||
                 agent.modelType.toLowerCase().includes(searchTermLower)
             );
@@ -141,16 +138,16 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
     // Sort agents based on sort option
     useEffect(() => {
         if (sortOption === 'Default') return;
-        
-        const sortedAgents = {...agentsData};
-        const sortFn = sortOption === 'Latest' 
-            ? (a, b) => b.userCount - a.userCount 
+
+        const sortedAgents = { ...agentsData };
+        const sortFn = sortOption === 'Latest'
+            ? (a, b) => b.userCount - a.userCount
             : (a, b) => a.userCount - b.userCount;
-            
+
         Object.keys(sortedAgents).forEach(category => {
             sortedAgents[category] = [...sortedAgents[category]].sort(sortFn);
         });
-        
+
         setAgentsData(sortedAgents);
     }, [sortOption]);
 
@@ -170,7 +167,6 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
     const handleSortChange = (option) => {
         setSortOption(option);
         setIsSortOpen(false);
-        console.log("Sorting by:", option);
     };
 
     // Check if we have any search results
@@ -193,7 +189,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
             <div className="flex h-screen bg-black text-white items-center justify-center">
                 <div className="text-center p-4">
                     <p className="text-red-500 mb-2">{error}</p>
-                    <button 
+                    <button
                         onClick={() => window.location.reload()}
                         className="bg-blue-600 px-4 py-2 rounded text-white"
                     >
@@ -208,22 +204,22 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
         <div className="flex h-screen bg-black text-white overflow-hidden">
             {/* Mobile Sidebar Overlay */}
             {showSidebar && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black/80 z-40 sm:hidden"
                     onClick={() => setShowSidebar(false)}
                 />
             )}
-            
+
             {/* Mobile Sidebar (conditionally rendered) */}
             {showSidebar && (
-                <div className="sm:hidden fixed inset-y-0 left-0 z-50"> 
+                <div className="sm:hidden fixed inset-y-0 left-0 z-50">
                     <AdminSidebar />
                 </div>
             )}
-            
-           
+
+
             {/* Main Content */}
-            <div className="flex-1 flex flex-col h-full overflow-hidden"> 
+            <div className="flex-1 flex flex-col h-full overflow-hidden">
                 {!showCreateGpt ? (
                     <>
                         {/* Header Section - Revised Layout */}
@@ -257,7 +253,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                             <div className="block sm:hidden">
                                 {/* Mobile Row 1: Menu + Title */}
                                 <div className="flex items-center mb-3">
-                                    <button 
+                                    <button
                                         onClick={() => setShowSidebar(!showSidebar)}
                                         className="p-1.5 rounded-lg hover:bg-gray-800 mr-3"
                                     >
@@ -266,7 +262,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                     {/* Added flex-1 and text-center to center the title */}
                                     <h1 className="flex-1 text-center text-xl font-bold">Admin-Dashboard</h1>
                                     {/* Placeholder div for balance, adjust width if needed (approx button width + margin) */}
-                                    <div className="w-[46px] flex-shrink-0"></div> 
+                                    <div className="w-[46px] flex-shrink-0"></div>
                                 </div>
                                 {/* Mobile Row 2: Search + Create Button */}
                                 <div className="flex items-center gap-3">
@@ -293,7 +289,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                         </div>
 
                         {/* Main Content Area - Changed: removed overflow-y-auto, added overflow-hidden */}
-                        <div className="flex-1 flex flex-col p-4 sm:p-6 overflow-hidden"> 
+                        <div className="flex-1 flex flex-col p-4 sm:p-6 overflow-hidden">
                             {searchTerm && !hasSearchResults ? (
                                 <div className="text-center py-8 text-gray-400 flex-shrink-0">
                                     No agents found matching "{searchTerm}"
@@ -357,21 +353,21 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                     </div>
 
                                     {/* Scrollable Container for Categories - Changed: added flex-1, removed max-h */}
-                                    <div className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"> 
+                                    <div className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                                         {/* Render Categories using CategorySection */}
                                         {Object.entries(filteredAgentsData).map(([category, agents]) => {
                                             if (category === 'featured' || agents.length === 0) return null;
-                                            
+
                                             const categoryTitle = category
-                                                .replace(/([A-Z])/g, ' $1') 
-                                                .replace(/^./, (str) => str.toUpperCase()); 
-                                            
+                                                .replace(/([A-Z])/g, ' $1')
+                                                .replace(/^./, (str) => str.toUpperCase());
+
                                             return (
-                                                <CategorySection 
+                                                <CategorySection
                                                     key={category}
-                                                    title={categoryTitle} 
-                                                    agentCount={agents.length} 
-                                                    agents={agents} 
+                                                    title={categoryTitle}
+                                                    agentCount={agents.length}
+                                                    agents={agents}
                                                 />
                                             );
                                         })}
@@ -382,8 +378,8 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                     </>
                 ) : (
                     <div className="h-full">
-                        <CreateCustomGpt 
-                            onGoBack={() => setShowCreateGpt(false)} 
+                        <CreateCustomGpt
+                            onGoBack={() => setShowCreateGpt(false)}
                             onGptCreated={() => {
                                 setGptCreated(prev => !prev);
                                 setShowCreateGpt(false);

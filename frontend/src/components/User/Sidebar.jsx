@@ -11,9 +11,8 @@ import {
   IoSettingsOutline
 } from 'react-icons/io5';
 import { useAuth } from '../../context/AuthContext';
-import axios from 'axios';
+import { axiosInstance } from '../../api/axiosInstance';
 
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -26,7 +25,7 @@ const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
   useEffect(() => {
     const fetchAssignedGpts = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/custom-gpts/user/assigned`, {
+        const response = await axiosInstance.get(`/api/custom-gpts/user/assigned`, {
           withCredentials: true
         });
         

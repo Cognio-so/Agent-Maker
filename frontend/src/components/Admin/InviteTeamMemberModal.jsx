@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { FiMail, FiX, FiUser, FiSend } from 'react-icons/fi';
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+import { axiosInstance } from '../../api/axiosInstance';
 
 const InviteTeamMemberModal = ({ isOpen, onClose }) => {
   const [email, setEmail] = useState('');
@@ -17,8 +15,8 @@ const InviteTeamMemberModal = ({ isOpen, onClose }) => {
     setError('');
 
     try {
-      const response = await axios.post(
-        `${API_URL}/api/auth/invite`,
+      const response = await axiosInstance.post(
+        `/api/auth/invite`,
         { email, role },
         { withCredentials: true }
       );

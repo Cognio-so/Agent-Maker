@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { IoClose, IoCheckmark, IoSearch } from 'react-icons/io5';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+import { axiosInstance } from '../../api/axiosInstance';
 
 const AssignGptsModal = ({ isOpen, onClose, teamMember, onAssignmentChanged }) => {
     const [availableGpts, setAvailableGpts] = useState([]);
@@ -22,7 +21,7 @@ const AssignGptsModal = ({ isOpen, onClose, teamMember, onAssignmentChanged }) =
     const fetchGpts = async () => {
         try {
             setIsLoading(true);
-            const response = await axios.get(`${API_URL}/api/custom-gpts`, { withCredentials: true });
+            const response = await axiosInstance.get(`/api/custom-gpts`, { withCredentials: true });
             
             if (response.data.success) {
                 setAvailableGpts(response.data.customGpts);
@@ -38,8 +37,8 @@ const AssignGptsModal = ({ isOpen, onClose, teamMember, onAssignmentChanged }) =
     const fetchAssignedGpts = async () => {
         try {
             setIsLoading(true);
-            const response = await axios.get(
-                `${API_URL}/api/custom-gpts/team/members/${teamMember.id}/gpts`, 
+            const response = await axiosInstance.get(
+                `/api/custom-gpts/team/members/${teamMember.id}/gpts`, 
                 { withCredentials: true }
             );
             
@@ -62,16 +61,16 @@ const AssignGptsModal = ({ isOpen, onClose, teamMember, onAssignmentChanged }) =
             
             if (isCurrentlyAssigned) {
                 // Unassign the GPT - updated URL
-                await axios.delete(
-                    `${API_URL}/api/custom-gpts/team/members/${teamMember.id}/gpts/${gptId}`, 
+                await axiosInstance.delete(
+                    `/api/custom-gpts/team/members/${teamMember.id}/gpts/${gptId}`, 
                     { withCredentials: true }
                 );
                 setAssignedGpts(assignedGpts.filter(gpt => gpt._id !== gptId));
                 toast.success("GPT unassigned successfully");
             } else {
                 // Assign the GPT - updated URL
-                await axios.post(
-                    `${API_URL}/api/custom-gpts/team/members/${teamMember.id}/gpts`, 
+                await axiosInstance.post(
+                    `/api/custom-gpts/team/members/${teamMember.id}/gpts`, 
                     { gptId }, 
                     { withCredentials: true }
                 );

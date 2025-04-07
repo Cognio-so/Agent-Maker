@@ -9,13 +9,12 @@ import {
   IoEllipse,
   IoArrowBack
 } from 'react-icons/io5';
-import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 // Import team member data
 import { teamMembers } from './teamData';
+import { axiosInstance } from '../../api/axiosInstance';
 
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 const HistoryPage = () => {
   const navigate = useNavigate();

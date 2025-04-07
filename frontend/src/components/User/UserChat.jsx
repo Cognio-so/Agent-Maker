@@ -4,9 +4,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import ChatInput from './ChatInput';
 import { useAuth } from '../../context/AuthContext';
 import { IoPersonCircleOutline, IoSettingsOutline, IoPersonOutline, IoArrowBack } from 'react-icons/io5';
-import axios from 'axios';
+import { axiosInstance } from '../../api/axiosInstance';
 
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 const UserChat = () => {
     const location = useLocation();
@@ -34,7 +33,7 @@ const UserChat = () => {
             const fetchGptData = async () => {
                 try {
                     setIsFetchingGpt(true);
-                    const response = await axios.get(`${API_URL}/api/custom-gpts/user/assigned/${gptId}`, { withCredentials: true });
+                    const response = await axiosInstance.get(`/api/custom-gpts/user/assigned/${gptId}`, { withCredentials: true });
                     
                     if (response.data.success) {
                         setGptData(response.data.customGpt);

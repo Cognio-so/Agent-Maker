@@ -1,56 +1,96 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom'; 
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { axiosInstance, setAccessToken, getAccessToken, removeAccessToken } from '../api/axiosInstance';
 
-const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'https://agent-maker-backend.vercel.app';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [accessToken, _setAccessToken] = useState(() => getAccessToken());
   const [loading, setLoading] = useState(true); 
-  const [error, setError] = useState(null);     
-  const navigate = useNavigate(); 
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
+  const location = useLocation(); 
 
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const response = await axios.get(`${BASE_URL}/api/auth/me`, { withCredentials: true });
-        if (response.data) {
-          setUser(response.data);
-          // This depends on your app's needs - you may want to comment this out
-          if (response.data.role === 'admin') {
-            navigate('/admin');
-          } else {
-            navigate('/user');
-          }
-        }
-      } catch (err) {
-        console.log("Not authenticated");
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadUser();
+
+  const updateAccessToken = useCallback((token) => {
+    if (token) {
+      setAccessToken(token); 
+      _setAccessToken(token); 
+    } else {
+      removeAccessToken(); 
+      _setAccessToken(null); 
+    }
   }, []);
+
+
+  const fetchUser = useCallback(async () => {
+    const currentToken = getAccessToken(); 
+    if (!currentToken) {
+      setUser(null);
+      setLoading(false);
+      return; 
+    }
+    setLoading(true); 
+     try {
+        const response = await axiosInstance.get('/api/auth/me');
+        if (response.data) {
+            setUser(response.data);
+        } else {
+             updateAccessToken(null); 
+             setUser(null);
+        }
+    } catch (err) {
+        updateAccessToken(null);
+        setUser(null);
+    } finally {
+        setLoading(false);
+    }
+  }, [updateAccessToken]);
+
+
+   useEffect(() => {
+        if (accessToken) { 
+             fetchUser();
+        } else {
+             setLoading(false); 
+        }
+    }, [accessToken, fetchUser]); 
+
+   const handleAuthCallback = useCallback((token, userData) => {
+        updateAccessToken(token); 
+        setUser(userData);        
+        setLoading(false);        
+        if (userData?.role === 'admin') {
+            navigate('/admin', { replace: true });
+        } else {
+            navigate('/employee', { replace: true });
+        }
+   }, [navigate, updateAccessToken]);
+
 
   const login = async (email, password) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post(`${BASE_URL}/api/auth/login`, { email, password }, { withCredentials: true });
-      console.log("Login response:", response.data);
-      if (response.data) {
-        setUser(response.data);
-        if (response.data.role === 'admin') {
+      const response = await axiosInstance.post('/api/auth/login', { email, password });
+      if (response.data?.accessToken && response.data?.user) {
+        updateAccessToken(response.data.accessToken); 
+        setUser(response.data.user);                 
+        if (response.data.user.role === 'admin') {
           navigate('/admin');
         } else {
-          navigate('/user');
+          navigate('/employee');
         }
+      } else {
+         setError('Login failed: Invalid response from server.');
+         updateAccessToken(null);
+         setUser(null);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
+      updateAccessToken(null);
       setUser(null);
     } finally {
       setLoading(false);
@@ -61,9 +101,11 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post(`${BASE_URL}/api/auth/signup`, { name, email, password }, { withCredentials: true });
-      if (response.data) {
-        navigate('/login');
+      const response = await axiosInstance.post('/api/auth/signup', { name, email, password });
+      if (response.status === 201) {
+        navigate('/login?signup=success'); 
+      } else {
+         setError(response.data?.message || 'Signup completed but with unexpected status.');
       }
     } catch (err) {
        setError(err.response?.data?.message || 'Signup failed');
@@ -75,64 +117,65 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     setLoading(true);
     setError(null);
+    const currentToken = getAccessToken();
+
     try {
-        // 1. Call the new endpoint to mark user as inactive in the DB
-        // We assume the user is logged in if they are calling logout,
-        // so this request should be authenticated.
-        try {
-            await axios.put(`${BASE_URL}/api/auth/me/inactive`, {}, { withCredentials: true });
-        } catch (inactiveErr) {
-            // Log the error, but proceed with logout anyway
-            console.error("Failed to mark user as inactive:", inactiveErr.response?.data?.message || inactiveErr.message);
+        if (currentToken && user) { 
+             try {
+                 await axiosInstance.put('/api/auth/me/inactive');
+             } catch (inactiveErr) {
+                 console.error("Failed to mark user as inactive (proceeding with logout):", inactiveErr.response?.data?.message || inactiveErr.message);
+             }
         }
 
-        // 2. Call the original logout endpoint to clear the session/cookie
-        await axios.post(`${BASE_URL}/api/auth/logout`, {}, { withCredentials: true });
-        
-        // 3. Clear user state and navigate
-        setUser(null);
-        navigate('/login'); 
+        await axiosInstance.post('/api/auth/logout');
+
     } catch (err) {
-        // Handle errors from the main logout call specifically
-        setError(err.response?.data?.message || 'Logout failed');
-        console.error("Logout error:", err);
-        // Attempt to clear user state even if backend calls fail partially
-        setUser(null); 
-        navigate('/login');
+      setError(err.response?.data?.message || 'Logout failed');
     } finally {
+        updateAccessToken(null); 
+        setUser(null);          
+        delete axiosInstance.defaults.headers.common['Authorization'];
         setLoading(false);
+        navigate('/login');     
     }
   };
 
-  const googleAuth = async () => {
+   const googleAuthInitiate = () => {
     setLoading(true);
-    setError(null);
     try {
-      // Redirect to backend Google Auth initiation endpoint
-      window.location.href = `${BASE_URL}/api/auth/google`;
+      const redirectUrl = `${axiosInstance.defaults.baseURL}/api/auth/google`;
+      
+      updateAccessToken(null);
+      setUser(null);
+      
+      window.location.href = redirectUrl;
     } catch (err) {
-      setError(err.response?.data?.message || 'Google authentication initiation failed');
-      console.error("Google auth error:", err);
-    } finally {
       setLoading(false);
+      setError('Google authentication initiation failed');
     }
   };
+
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      error, 
-      login, 
-      signup, 
-      logout, 
-      googleAuth, 
-      setError 
+    <AuthContext.Provider value={{
+      user,
+      accessToken, 
+      loading,
+      error,
+      login,
+      signup,
+      logout,
+      googleAuthInitiate, 
+      handleAuthCallback, 
+      fetchUser,          
+      setError
     }}>
       {children}
     </AuthContext.Provider>
   );
 };
+
 export const useAuth = () => {
   return useContext(AuthContext);
 };

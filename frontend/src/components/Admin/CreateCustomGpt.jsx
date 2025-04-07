@@ -6,11 +6,10 @@ import { SiOpenai, SiGooglegemini } from 'react-icons/si';
 import { BiLogoMeta } from 'react-icons/bi';
 import { FaRobot } from 'react-icons/fa6';
 import { RiOpenaiFill } from 'react-icons/ri';
-import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
+import { axiosInstance } from '../../api/axiosInstance';
 
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api';
 
 const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
     const navigate = useNavigate();
@@ -35,13 +34,15 @@ const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
     const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false); // State for dropdown
     const [knowledgeFiles, setKnowledgeFiles] = useState([]); // State for knowledge files
     const [isMobileView, setIsMobileView] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(false); // Keep for initial fetch in edit mode
+    const [isSaving, setIsSaving] = useState(false); // New state for save button
     const [isEditMode, setIsEditMode] = useState(false);
 
     // Check if we're in edit mode
     useEffect(() => {
         if (editGptId) {
             setIsEditMode(true);
+            setIsLoading(true); // Set loading true only for initial fetch
             fetchGptDetails(editGptId);
         }
     }, [editGptId]);
@@ -49,9 +50,8 @@ const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
     // Fetch GPT details if in edit mode
     const fetchGptDetails = async (id) => {
         try {
-            setIsLoading(true);
-            const response = await axios.get(
-                `${API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`}/custom-gpts/${id}`, 
+            const response = await axiosInstance.get(
+                `${axiosInstance.defaults.baseURL.endsWith('/api') ? axiosInstance.defaults.baseURL : `${axiosInstance.defaults.baseURL}/api`}/custom-gpts/${id}`, 
                 { withCredentials: true }
             );
             
@@ -81,7 +81,7 @@ const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
                     url: file.fileUrl,
                     // Mark as already uploaded to distinguish from new files
                     isUploaded: true,
-                    index: gpt.knowledgeFiles.indexOf(file)
+                    index: gpt.knowledgeFiles.indexOf(file) // Maintain original index if needed
                 })));
             }
             
@@ -89,7 +89,7 @@ const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
             console.error("Error fetching GPT details:", error);
             toast.error("Failed to load GPT details");
         } finally {
-            setIsLoading(false);
+            setIsLoading(false); // Stop loading after fetch completes/fails
         }
     };
 
@@ -177,24 +177,20 @@ const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
         // If the file is already uploaded to the server and we're in edit mode
         if (fileToRemove.isUploaded && isEditMode && editGptId) {
             try {
-                setIsLoading(true);
-                await axios.delete(
-                    `${API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`}/custom-gpts/${editGptId}/knowledge/${fileToRemove.index}`, 
+                await axiosInstance.delete(
+                    `${axiosInstance.defaults.baseURL.endsWith('/api') ? axiosInstance.defaults.baseURL : `${axiosInstance.defaults.baseURL}/api`}/custom-gpts/${editGptId}/knowledge/${fileToRemove.index}`, // Using original index
                     { withCredentials: true }
                 );
                 toast.success("File deleted successfully");
+                setKnowledgeFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
             } catch (error) {
                 console.error("Error deleting file:", error);
                 toast.error("Failed to delete file");
-                setIsLoading(false);
                 return; // Don't remove from UI if server deletion failed
-            } finally {
-                setIsLoading(false);
             }
+        } else {
+            setKnowledgeFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
         }
-        
-        // Remove from UI
-        setKnowledgeFiles(knowledgeFiles.filter((_, i) => i !== index));
     };
 
     // Example prompt templates
@@ -206,9 +202,9 @@ const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
 
     // Save the custom GPT
     const handleSaveGpt = async () => {
-        try {
-            setIsLoading(true);
+        setIsSaving(true); // Start saving state for the button
             
+        try {
             // Prepare form data for API
             const apiFormData = new FormData();
             apiFormData.append('name', formData.name);
@@ -223,66 +219,66 @@ const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
                 apiFormData.append('image', imageFile);
             }
             
-            // Add knowledge files if selected (only those not yet uploaded)
             const newKnowledgeFiles = knowledgeFiles.filter(file => !file.isUploaded);
             newKnowledgeFiles.forEach(fileObj => {
                 apiFormData.append('knowledgeFiles', fileObj.file);
             });
             
             let response;
+            let successMessage = '';
             
             if (isEditMode) {
-                // Update existing GPT - FIX: Remove '/complete'
-                response = await axios.put(
-                    `${API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`}/custom-gpts/${editGptId}`, // Removed /complete
+                response = await axiosInstance.put(
+                    `${axiosInstance.defaults.baseURL.endsWith('/api') ? axiosInstance.defaults.baseURL : `${axiosInstance.defaults.baseURL}/api`}/custom-gpts/${editGptId}`, 
                     apiFormData, 
                     { 
                         withCredentials: true,
                         headers: { 'Content-Type': 'multipart/form-data' } 
                     }
                 );
-                toast.success("Custom GPT updated successfully!");
+                successMessage = "Custom GPT updated successfully!";
             } else {
-                // Create new GPT - FIX: Remove '/complete'
-                response = await axios.post(
-                    `${API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`}/custom-gpts`, // Removed /complete
+                response = await axiosInstance.post(
+                    `${axiosInstance.defaults.baseURL.endsWith('/api') ? axiosInstance.defaults.baseURL : `${axiosInstance.defaults.baseURL}/api`}/custom-gpts`, 
                     apiFormData, 
                     { 
                         withCredentials: true,
                         headers: { 'Content-Type': 'multipart/form-data' } 
                     }
                 );
-                toast.success("Custom GPT created successfully!");
+                 successMessage = "Custom GPT created successfully!";
             }
             
-            // Try direct navigation as a backup
-            try {
-                onGoBack(); // Try the provided callback first
-            } catch (navError) {
-                console.error("Error in onGoBack:", navError);
-                navigate('/admin'); // Fallback to direct navigation
-            }
-            
-            // After successful creation
-            if (response.data.success) {
-                toast.success('GPT created successfully!');
-                // Call the callback to refresh parent component
+            if (response.status === 200 || response.status === 201) {
+                toast.success(successMessage);
+                
+                // Call the callback to notify parent *before* navigating
                 if (onGptCreated) {
-                    onGptCreated();
+                    onGptCreated(); 
                 }
+
+                // Navigate back after success and notification
+                if (onGoBack) {
+                   onGoBack();
+                } else {
+                    navigate('/admin'); // Fallback navigation
+                }
+
+            } else {
+                 toast.error(response.data?.message || "Failed to save Custom GPT");
             }
             
         } catch (error) {
             console.error("Error saving GPT:", error);
-            toast.error(error.response?.data?.message || "Failed to save Custom GPT");
+            toast.error(error.response?.data?.message || "An error occurred while saving.");
         } finally {
-            setIsLoading(false);
+            setIsSaving(false); 
         }
     };
 
-    if (isLoading) {
+    if (isLoading && isEditMode) {
         return (
-            <div className="w-full h-full flex items-center justify-center">
+            <div className="w-full h-full flex items-center justify-center bg-[#1A1A1A]">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
             </div>
         );
@@ -621,13 +617,22 @@ const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
                         </div>
                     </div>
                     
-                    {/* Save Button */}
+                    {/* Save Button - Updated */}
                     <div className="mt-4 md:mt-6 pt-3 md:pt-4 border-t border-gray-700">
                         <button 
                             onClick={handleSaveGpt}
-                            className="w-full px-4 py-2 md:py-3 rounded-md text-white text-sm md:text-base font-medium bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 transition-colors shadow-lg"
+                            disabled={isSaving} // Disable button when saving
+                            className={`w-full px-4 py-2 md:py-3 rounded-md text-white text-sm md:text-base font-medium transition-colors shadow-lg ${
+                                isSaving 
+                                ? 'bg-gray-500 cursor-not-allowed' 
+                                : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700'
+                            }`}
                         >
-                            {isEditMode ? "Update Configuration" : "Save Configuration"}
+                            {isSaving 
+                                ? 'Saving...' 
+                                : isEditMode 
+                                    ? "Update Configuration" 
+                                    : "Save Configuration"}
                         </button>
                     </div>
                 </div>

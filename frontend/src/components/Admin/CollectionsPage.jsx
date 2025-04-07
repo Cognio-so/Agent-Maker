@@ -6,9 +6,8 @@ import { FaRobot } from 'react-icons/fa6';
 import { BiLogoMeta } from 'react-icons/bi';
 import { RiOpenaiFill } from 'react-icons/ri';
 import { useNavigate } from 'react-router-dom';
+import { axiosInstance } from '../../api/axiosInstance';
 
-// API URL from environment variables
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 const CollectionsPage = () => {
     const [customGpts, setCustomGpts] = useState([]);
@@ -48,7 +47,7 @@ const CollectionsPage = () => {
     const fetchCustomGpts = async () => {
         try {
             setLoading(true);
-            const response = await axios.get(`${API_URL}/api/custom-gpts`, { withCredentials: true });
+            const response = await axiosInstance.get(`/api/custom-gpts`, { withCredentials: true });
             
             if (response.data.success) {
                 setCustomGpts(response.data.customGpts);
@@ -67,7 +66,7 @@ const CollectionsPage = () => {
         if (window.confirm("Are you sure you want to delete this GPT? This action cannot be undone.")) {
             try {
                 setLoading(true);
-                const response = await axios.delete(`${API_URL}/api/custom-gpts/${id}`, { withCredentials: true });
+                const response = await axiosInstance.delete(`/api/custom-gpts/${id}`, { withCredentials: true });
                 
                 if (response.data.success) {
                     setCustomGpts(customGpts.filter(gpt => gpt._id !== id));

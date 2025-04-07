@@ -1,10 +1,11 @@
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
-const { generateToken } = require('../lib/utilis');
+const { generateAccessToken, generateRefreshTokenAndSetCookie, clearRefreshTokenCookie } = require('../lib/utilis');
 const passport = require('passport');
 const crypto = require('crypto');
 const Invitation = require('../models/Invitation');
 const nodemailer = require('nodemailer');
+const jwt = require('jsonwebtoken');
 
 const Signup = async (req, res) => {
     const { name, email, password } = req.body;
@@ -31,9 +32,8 @@ const Signup = async (req, res) => {
             await newUser.save();
 
             res.status(201).json({
-                _id: newUser._id,
-                name: newUser.name,
-                email: newUser.email,
+                success: true,
+                message: "Signup successful. Please login."
             });
 
         }
@@ -68,74 +68,133 @@ const Login = async (req, res) => {
         user.lastActive = new Date();
         await user.save();
 
-        generateToken(res, user._id);
+        // Generate tokens
+        const accessToken = generateAccessToken(user._id);
+        generateRefreshTokenAndSetCookie(res, user._id);
 
+        // Return access token and user info in the response body
         res.status(200).json({
-            _id: user._id,
-            name: user.name,
-            email: user.email,
-            profilePic: user.profilePic,
-            role: user.role
-          });
+            accessToken,
+            user: {
+              _id: user._id,
+              name: user.name,
+              email: user.email,
+              profilePic: user.profilePic,
+              role: user.role
+            }
+        });
 
-        
     }
     catch(error){
-        res.status(500).json({message:error.message});
+        console.error("Login Error:", error);
+        res.status(500).json({message: 'Server error during login.'});
     }
 }
 
 const googleAuth = passport.authenticate('google', { scope: ['profile', 'email'] });
 
 const googleAuthCallback = (req, res, next) => {
-  passport.authenticate('google', async (err, user, info) => {
-    if (err) { return next(err); }
+  
+  passport.authenticate('google', {
+      failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=google_auth_failed`,
+      session: false
+    }, async (err, user, info) => {
+    
+    if (err) {
+        console.error("Google Auth Error:", err);
+        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=google_auth_error`);
+    }
     if (!user) {
-      return res.status(401).json({ message: info.message || 'Google authentication failed' });
+        console.error("Google Auth Failed:", info?.message);
+        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=${encodeURIComponent(info?.message || 'google_auth_failed')}`);
     }
 
-    // Update lastActive for Google login
+    
+    // User authenticated successfully by Google Strategy
     try {
-      user.lastActive = new Date();
-      await user.save();
-    } catch (error) {
-      console.error("Error updating lastActive:", error);
-    }
+        // Update lastActive for Google login
+        user.lastActive = new Date();
+        await user.save();
 
-    req.logIn(user, (loginErr) => {
-      if (loginErr) { return next(loginErr); }
-
-      generateToken(res, user._id);
-
-      // Redirect based on user role
-      const redirectUrl = user.role === 'admin' 
-        ? `${process.env.FRONTEND_URL || 'https://agent-maker-frontend.vercel.app'}/admin`
-        : `${process.env.FRONTEND_URL || 'https://agent-maker-frontend.vercel.app'}/user`;
+        // Generate tokens
+        const accessToken = generateAccessToken(user._id);
+        generateRefreshTokenAndSetCookie(res, user._id);
         
-      return res.redirect(redirectUrl);
-    });
+
+        // Redirect to a dedicated frontend callback handler page/route
+        const feRedirectUrl = new URL(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/callback`);
+        feRedirectUrl.searchParams.set('accessToken', accessToken);
+        feRedirectUrl.searchParams.set('user', JSON.stringify({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            profilePic: user.profilePic,
+            role: user.role
+        }));
+
+        return res.redirect(feRedirectUrl.toString());
+
+    } catch (error) {
+        console.error("Error during Google auth token generation/redirect:", error);
+        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=processing_failed`);
+    }
   })(req, res, next);
 };
 
-const Logout = async (req, res) => {    
-    res.clearCookie('token');
-    res.status(200).json({message:'Logged out successfully'});
+const Logout = async (req, res) => {
+    clearRefreshTokenCookie(res);
+    res.status(200).json({ message: 'Logged out successfully' });
 }
+
+const refreshTokenController = async (req, res) => {
+    const refreshToken = req.cookies.refreshToken;
+
+    if (!refreshToken) {
+        return res.status(401).json({ message: 'Refresh token not found' });
+    }
+
+    try {
+        // Verify the refresh token
+        const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+
+        // Optional: Check if refresh token is revoked in DB if implementing revocation
+        const user = await User.findById(decoded.userId);
+        if (!user) {
+             return res.status(401).json({ message: 'User not found for refresh token' });
+        }
+        // Issue a new access token
+        const newAccessToken = generateAccessToken(decoded.userId);
+
+        // Optionally update lastActive here as well
+        user.lastActive = new Date();
+        await user.save();
+
+        res.status(200).json({ accessToken: newAccessToken });
+
+    } catch (error) {
+         console.error("Refresh Token Error:", error);
+         clearRefreshTokenCookie(res); // Clear invalid refresh token cookie
+         if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+             return res.status(403).json({ message: 'Invalid or expired refresh token' });
+         }
+         return res.status(500).json({ message: 'Server error during token refresh' });
+    }
+};
 
 const getCurrentUser = async (req, res) => {
     try {
-        // req.user should be populated by your auth middleware
+        // req.user is populated by protectRoute middleware (using access token)
         const userId = req.user._id;
-        
+
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
-        
-        // Update lastActive timestamp when user data is fetched
+
+        // Update lastActive timestamp when user data is fetched via protected route
         user.lastActive = new Date();
         await user.save();
-        
+
         res.status(200).json({
             _id: user._id,
             name: user.name,
@@ -144,7 +203,8 @@ const getCurrentUser = async (req, res) => {
             role: user.role
         });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error("Get Current User Error:", error);
+        res.status(500).json({ message: 'Server error fetching user data.' });
     }
 };
 
@@ -233,7 +293,6 @@ const inviteTeamMember = async (req, res) => {
     
     try {
       await transporter.sendMail(mailOptions);
-      console.log('Invitation email sent to:', email);
       
       return res.status(200).json({
         success: true,
@@ -297,12 +356,11 @@ const setInactive = async (req, res) => {
     try {
         // req.user is available thanks to protectRoute middleware
         if (!req.user || !req.user._id) {
-            // This case should theoretically not happen if protectRoute is working
             return res.status(401).json({ message: 'Not authorized' });
         }
 
         const userId = req.user._id;
-        await User.findByIdAndUpdate(userId, { lastActive: null }); // Set lastActive to null
+        await User.findByIdAndUpdate(userId, { $set: { lastActive: null } });
 
         res.status(200).json({ success: true, message: 'User marked as inactive.' });
     } catch (error) {
@@ -311,4 +369,4 @@ const setInactive = async (req, res) => {
     }
 };
 
-module.exports = { Signup, Login, Logout, googleAuth, googleAuthCallback, getCurrentUser, getAllUsers, inviteTeamMember, getPendingInvitesCount, setInactive };
+module.exports = { Signup, Login, Logout, googleAuth, googleAuthCallback, refreshTokenController, getCurrentUser, getAllUsers, inviteTeamMember, getPendingInvitesCount, setInactive };

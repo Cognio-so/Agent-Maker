@@ -10,9 +10,7 @@ import {
     IoAppsOutline
 } from 'react-icons/io5';
 import { FiBox, FiMessageSquare, FiActivity} from 'react-icons/fi';
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+import { axiosInstance } from '../../api/axiosInstance';    
 
 const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
     const [activeTab, setActiveTab] = useState('profile');
@@ -113,8 +111,7 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
 
     const renderAssignedGptsTab = () => {
         const handleRemoveGpt = (gptId) => {
-            // In a real implementation, this would call the API to unassign the GPT
-            console.log(`Removing GPT with ID: ${gptId} from user ${member.id}`);
+            console.log("Removing GPT with ID:", gptId);
         };
 
         return (

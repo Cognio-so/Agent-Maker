@@ -53,15 +53,9 @@ const AdminMessageInput = ({ onSubmit, onFileUpload }) => {
     const handleFileChange = (e) => {
         const files = e.target.files;
         if (files && files.length > 0) {
-            console.log("Files selected:", files); 
-            // Pass the files up to the parent component if onFileUpload prop is provided
             if (onFileUpload) {
                  onFileUpload(files);
             }
-            // Example: You could store file info in state to display names, etc.
-            // setSelectedFiles(Array.from(files)); 
-
-            // Reset the input value to allow selecting the same file again if needed
              e.target.value = null; 
         }
     };

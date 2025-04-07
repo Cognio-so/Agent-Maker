@@ -13,13 +13,12 @@ import {
     FiTrash2,
     FiChevronRight
 } from 'react-icons/fi';
-import axios from 'axios';
 import AssignGptsModal from './AssignGptsModal';
 import TeamMemberDetailsModal from './TeamMemberDetailsModal';
 import InviteTeamMemberModal from './InviteTeamMemberModal';
+import { axiosInstance } from '../../api/axiosInstance';
 
 // API URL from environment variables
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 // List of departments for filter dropdown (static data since backend doesn't have this info)
 const departments = [
@@ -69,7 +68,7 @@ const TeamManagement = () => {
             try {
                 setLoading(true);
                 // Get all users - Note: You need to implement this endpoint in the backend
-                const response = await axios.get(`${API_URL}/api/auth/users`, { 
+                const response = await axiosInstance.get(`/api/auth/users`, { 
                     withCredentials: true 
                 });
                 
@@ -118,7 +117,7 @@ const TeamManagement = () => {
     useEffect(() => {
         const fetchPendingInvites = async () => {
             try {
-                const response = await axios.get(`${API_URL}/api/auth/pending-invites/count`, { 
+                const response = await axiosInstance.get(`/api/auth/pending-invites/count`, { 
                     withCredentials: true 
                 });
                 
@@ -138,7 +137,7 @@ const TeamManagement = () => {
     useEffect(() => {
         const fetchGptCounts = async () => {
             try {
-                const response = await axios.get(`${API_URL}/api/custom-gpts/team/gpt-counts`, { 
+                const response = await axiosInstance.get(`/api/custom-gpts/team/gpt-counts`, { 
                     withCredentials: true 
                 });
                 
@@ -342,7 +341,7 @@ const TeamManagement = () => {
     // Add this function to refresh data
     const refreshUserData = useCallback(async () => {
         try {
-            const response = await axios.get(`${API_URL}/api/auth/users`, { 
+            const response = await axiosInstance.get(`/api/auth/users`, { 
                 withCredentials: true 
             });
             
@@ -379,7 +378,7 @@ const TeamManagement = () => {
     // Add this as a separate function to be called when needed
     const fetchGptCounts = async () => {
         try {
-            const response = await axios.get(`${API_URL}/api/custom-gpts/team/gpt-counts`, { 
+            const response = await axiosInstance.get(`/api/custom-gpts/team/gpt-counts`, { 
                 withCredentials: true 
             });
             

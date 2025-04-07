@@ -4,9 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import AdminMessageInput from './AdminMessageInput';
 import { useAuth } from '../../context/AuthContext';
 import { IoPersonCircleOutline, IoSettingsOutline, IoPersonOutline, IoArrowBack } from 'react-icons/io5';
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+import { axiosInstance } from '../../api/axiosInstance';
 
 const AdminChat = () => {
     const { gptId } = useParams();
@@ -32,7 +30,7 @@ const AdminChat = () => {
             const fetchGptData = async () => {
                 try {
                     setIsFetchingGpt(true);
-                    const response = await axios.get(`${API_URL}/api/custom-gpts/${gptId}`, { withCredentials: true });
+                    const response = await axiosInstance.get(`/api/custom-gpts/${gptId}`, { withCredentials: true });
                     
                     if (response.data.success) {
                         setGptData(response.data.customGpt);

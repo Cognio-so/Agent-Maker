@@ -36,10 +36,8 @@ const InvitationSchema = new mongoose.Schema({
   }
 });
 
-// Index on token for faster lookups
 InvitationSchema.index({ token: 1 });
 
-// Index on email for faster lookups
 InvitationSchema.index({ email: 1 });
 
 module.exports = mongoose.model('Invitation', InvitationSchema); 

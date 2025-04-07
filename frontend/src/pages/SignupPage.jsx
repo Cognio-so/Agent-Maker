@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FcGoogle } from 'react-icons/fc';
 import { useAuth } from '../context/AuthContext';
@@ -7,38 +7,14 @@ const SignupPage = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { signup, loading, error, setError, googleAuth } = useAuth();
-  const googleButtonRef = useRef(null);
+  const { signup, loading, error, setError, googleAuthInitiate } = useAuth();
 
   useEffect(() => {
     setError(null);
   }, [setError]);
 
-  useEffect(() => {
-    // Initialize Google One Tap
-    if (window.google && googleButtonRef.current) {
-      window.google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-        callback: googleAuth,
-        auto_select: false,
-      });
-
-      window.google.accounts.id.renderButton(
-        googleButtonRef.current,
-        { 
-          type: 'standard', 
-          theme: 'outline', 
-          size: 'large',
-          text: 'signup_with',
-          width: '100%'
-        }
-      );
-    }
-  }, [googleAuth]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
     await signup(name, email, password);
   };
 
@@ -50,7 +26,7 @@ const SignupPage = () => {
         <div className="relative z-10 text-white px-12 max-w-lg">
           <h1 className="text-4xl font-bold mb-6">Join Our Community</h1>
           <p className="text-lg opacity-90 mb-8">
-            Create an account to access exclusive features and personalized experiences. 
+            Create an account to access exclusive features and personalized experiences.
             Leverage our AI-powered platform to transform the way you work and collaborate.
           </p>
           <div className="flex items-center space-x-3">
@@ -69,7 +45,7 @@ const SignupPage = () => {
           </div>
 
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">
               {error}
             </div>
           )}
@@ -89,7 +65,7 @@ const SignupPage = () => {
                 required
               />
             </div>
-            
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                 Email
@@ -104,7 +80,7 @@ const SignupPage = () => {
                 required
               />
             </div>
-            
+
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                 Password
@@ -127,25 +103,26 @@ const SignupPage = () => {
             >
               {loading ? 'Signing Up...' : 'Sign Up'}
             </button>
-            
+
             <div className="flex items-center my-4">
               <div className="flex-1 h-px bg-gray-300"></div>
               <p className="mx-4 text-sm text-gray-500">or</p>
               <div className="flex-1 h-px bg-gray-300"></div>
             </div>
-            
+
             <div>
               <button
-              type="button"
-              onClick={googleAuth}
-              className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
-            >
-              <FcGoogle size={20} />
-              Sign in with Google
-            </button>
+                type="button"
+                onClick={googleAuthInitiate}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+              >
+                <FcGoogle size={20} />
+                Sign up with Google
+              </button>
             </div>
           </form>
-          
+
           <p className="text-center mt-8 text-gray-600">
             Already have an account?{' '}
             <Link to="/login" className="text-black font-medium hover:underline">

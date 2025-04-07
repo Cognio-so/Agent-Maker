@@ -3,15 +3,16 @@ import { motion } from 'framer-motion';
 import ChatInput from './ChatInput';
 import { useAuth } from '../../context/AuthContext';
 import { IoPersonCircleOutline, IoSettingsOutline, IoPersonOutline } from 'react-icons/io5';
+import { useNavigate } from 'react-router-dom';
 
 const UserDashboard = () => {
     const { user, loading } = useAuth();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [userData, setUserData] = useState(null);
+    const navigate = useNavigate();
     
     // Use effect to debug and handle user data changes
     useEffect(() => {
-        console.log("Auth state:", { user, loading });
         if (user) {
             setUserData(user);
         }
