@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
     FiSearch, 
     FiFilter, 
@@ -11,7 +11,9 @@ import {
     FiMail, 
     FiEdit, 
     FiTrash2,
-    FiChevronRight
+    FiChevronRight,
+    FiChevronDown,
+    FiCheck
 } from 'react-icons/fi';
 import AssignGptsModal from './AssignGptsModal';
 import TeamMemberDetailsModal from './TeamMemberDetailsModal';
@@ -19,6 +21,7 @@ import InviteTeamMemberModal from './InviteTeamMemberModal';
 import EditPermissionsModal from './EditPermissionsModal';
 import { axiosInstance } from '../../api/axiosInstance';
 import { toast } from 'react-toastify';
+import { useTheme } from '../../context/ThemeContext';
 
 // API URL from environment variables
 
@@ -55,6 +58,10 @@ const TeamManagement = () => {
     const [refreshInterval, setRefreshInterval] = useState(null);
     const [showEditPermissionsModal, setShowEditPermissionsModal] = useState(false);
     const [selectedMemberForPermissions, setSelectedMemberForPermissions] = useState(null);
+    const { isDarkMode } = useTheme();
+    const actionsMenuRef = useRef(null);
+    const departmentFilterRef = useRef(null);
+    const statusFilterRef = useRef(null);
     
     // Add responsive detection
     useEffect(() => {
@@ -282,121 +289,62 @@ const TeamManagement = () => {
 
     // Mobile card view for team members
     const MobileTeamMemberCard = ({ member }) => (
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 mb-3">
-            <div className="flex items-center justify-between mb-3 relative">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-200 dark:border-gray-700 mb-3" onClick={() => handleViewMemberDetails(member)}>
+            <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center">
-                    <div className="h-10 w-10 bg-gray-600 rounded-full flex items-center justify-center text-white mr-3">
-                        {member.name.charAt(0)}
+                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center mr-3">
+                        <FiUser className="text-gray-600 dark:text-gray-300" />
                     </div>
                     <div>
-                        <div className="font-medium text-white cursor-pointer hover:text-blue-400"
-                             onClick={() => handleViewMemberDetails(member)}>
-                            {member.name}
-                        </div>
-                        <div className="text-sm text-gray-400">{member.email}</div>
+                        <p className="font-semibold text-gray-900 dark:text-white">{member.name}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{member.email}</p>
                     </div>
                 </div>
-                <button
-                    onClick={() => toggleActionsMenu(member.id)}
-                    className="text-gray-400 hover:text-gray-300 p-1"
-                >
-                    <FiMoreVertical />
-                </button>
-
-                {showActionsMenu === member.id && (
-                    <div className="absolute right-0 top-8 mt-2 w-48 rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50">
-                        <div className="py-1" role="menu" aria-orientation="vertical">
-                            <button
-                                className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                onClick={() => handleEmailTeamMember(member.email)}
-                            >
-                                <FiMail className="inline mr-2" />
-                                Email
-                            </button>
-                            <button
-                                className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                onClick={() => handleEditPermissions(member)}
-                            >
-                                <FiEdit className="inline mr-2" />
-                                Edit permissions
-                            </button>
-                            <button
-                                className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                onClick={() => handleAssignGpts(member)}
-                            >
-                                <FiBox className="inline mr-2" />
-                                Assign GPTs
-                            </button>
-                            <button
-                                className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-600"
-                                onClick={() => handleRemoveTeamMember(member.id)}
-                            >
-                                <FiTrash2 className="inline mr-2" />
-                                Remove
-                            </button>
+                <FiChevronRight className="text-gray-400 dark:text-gray-500" />
                         </div>
-                    </div>
-                )}
-            </div>
-            
-            <div className="grid grid-cols-2 gap-2 mb-3">
-                <div>
-                    <div className="text-xs text-gray-400">Role</div>
-                    <div className="text-sm text-white">{member.role}</div>
-                </div>
-                <div>
-                    <div className="text-xs text-gray-400">Department</div>
-                    <div className="text-sm text-white">{member.department}</div>
-                </div>
-                <div>
-                    <div className="text-xs text-gray-400">Position</div>
-                    <div className="text-sm text-white">{member.position}</div>
-                </div>
-                <div>
-                    <div className="text-xs text-gray-400">Assigned GPTs</div>
-                    <div className="text-sm text-white">{member.assignedGPTs}</div>
-                </div>
-            </div>
-            
-            <div className="flex justify-between items-center pt-2 border-t border-gray-700">
-                <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${member.status === 'Active' ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'}`}>
-                    <span className={`inline-block w-2 h-2 rounded-full mr-1.5 self-center ${member.status === 'Active' ? 'bg-green-400' : 'bg-red-400'}`}></span>
+            <div className="text-sm space-y-1">
+                <p><strong className="text-gray-600 dark:text-gray-300">Role:</strong> {member.role}</p>
+                <p><strong className="text-gray-600 dark:text-gray-300">Department:</strong> {member.department}</p>
+                <p><strong className="text-gray-600 dark:text-gray-300">Status:</strong>
+                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        member.status === 'Active'
+                            ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'
+                            : 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300'
+                    }`}>
                     {member.status}
                 </span>
-                
-                <div className="text-xs text-gray-400">
-                    Last active: {member.lastActive}
-                </div>
+                </p>
+                <p><strong className="text-gray-600 dark:text-gray-300">GPTs:</strong> {member.assignedGPTs}</p>
             </div>
         </div>
     );
 
     // Pass this function to the AssignGptsModal - it should trigger a recount
-    const handleGptAssignmentChange = () => {
-        // Fetch counts using the current state
+    const handleGptAssignmentChange = useCallback(() => {
         fetchGptCounts(teamMembers); 
-        setAssignmentChanged(prev => !prev); // Still useful for triggering other potential effects if needed
-    };
+    }, [fetchGptCounts, teamMembers]);
 
-    // Fix #4: Add a click-away handler to close any open menus when clicking elsewhere
+    // Effect to close dropdowns when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (showActionsMenu && !event.target.closest('button')) {
+            if (actionsMenuRef.current && !actionsMenuRef.current.contains(event.target)) {
+                if (!event.target.closest(`[data-member-id="${showActionsMenu}"]`)) {
                 setShowActionsMenu(null);
             }
-            if (showDepartmentsDropdown && !event.target.closest('button')) {
+            }
+            if (departmentFilterRef.current && !departmentFilterRef.current.contains(event.target)) {
                 setShowDepartmentsDropdown(false);
             }
-            if (showStatusDropdown && !event.target.closest('button')) {
+            if (statusFilterRef.current && !statusFilterRef.current.contains(event.target)) {
                 setShowStatusDropdown(false);
             }
         };
 
-        document.addEventListener('click', handleClickOutside);
+        document.addEventListener('mousedown', handleClickOutside);
         return () => {
-            document.removeEventListener('click', handleClickOutside);
+            document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [showActionsMenu, showDepartmentsDropdown, showStatusDropdown]);
+    }, [showActionsMenu]);
 
     // Add this useEffect for auto-refresh every 30 seconds
     useEffect(() => {
@@ -445,442 +393,233 @@ const TeamManagement = () => {
     }, [fetchGptCounts]);
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center h-full bg-black text-white">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
-        );
+        return <div className="flex justify-center items-center h-screen bg-white dark:bg-black"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div></div>;
     }
 
     if (error) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full bg-black text-white">
-                <p className="text-red-400 mb-4">{error}</p>
-                <button
-                    onClick={() => window.location.reload()}
-                    className="px-4 py-2 bg-blue-600 rounded-lg text-white hover:bg-blue-700"
-                >
-                    Try Again
-                </button>
-            </div>
-        );
+        return <div className="flex justify-center items-center h-screen bg-white dark:bg-black text-red-500 p-4">{error}</div>;
     }
 
     return (
-        <div className="flex flex-col h-full bg-black text-white">
-            {/* Add hidden scrollbar styles */}
+        <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 text-black dark:text-white p-4 sm:p-6 overflow-hidden">
             <style>{scrollbarHideStyles}</style>
-            
-            <div className="flex-none p-4 md:p-6">
-                {/* Header */}
-                <div className="mb-6 md:mb-8 flex flex-col text-center md:text-left md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-bold text-white">Team Management</h1>
-                        <p className="mt-1 text-sm text-gray-400">Manage your team members and their permissions</p>
-                    </div>
-                    <button 
-                        onClick={handleInviteMember}
-                        className="mt-4 md:mt-0 px-4 py-2 bg-blue-600 text-white rounded-md flex items-center justify-center font-medium hover:bg-blue-700 transition-colors mx-auto md:mx-0"
-                    >
-                        <FiUsers className="mr-2" /> 
-                        <span className="hidden xs:inline">Invite Team Member</span>
-                        <span className="xs:hidden">Invite</span>
-                    </button>
+            <div className="mb-6 flex-shrink-0">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Team Management</h1>
+                <p className="text-gray-600 dark:text-gray-400">Manage your team members, permissions, and GPT assignments.</p>
                 </div>
                 
-                {/* Stats Cards - Responsive grid - Updated for Mobile */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
-                    <div className="bg-gray-800 rounded-lg p-3 md:p-4 shadow border border-gray-700">
-                        <div className="flex items-center">
-                            <div className="p-2 md:p-3 rounded-full bg-blue-900 mr-3 md:mr-4">
-                                <FiUsers className="text-blue-300" size={16} />
-                            </div>
-                            <div>
-                                <h2 className="text-xl md:text-2xl font-bold text-white">{teamMembers.length}</h2>
-                                <p className="text-xs md:text-sm text-gray-400">Total Team Members</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-gray-800 rounded-lg p-3 md:p-4 shadow border border-gray-700">
-                        <div className="flex items-center">
-                            <div className="p-2 md:p-3 rounded-full bg-green-900 mr-3 md:mr-4">
-                                <FiUser className="text-green-300" size={16} />
-                            </div>
-                            <div>
-                                <h2 className="text-xl md:text-2xl font-bold text-white">
-                                    {teamMembers.filter(m => m.status === 'Active').length}
-                                </h2>
-                                <p className="text-xs md:text-sm text-gray-400">Active Members</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-gray-800 rounded-lg p-3 md:p-4 shadow border border-gray-700">
-                        <div className="flex items-center">
-                            <div className="p-2 md:p-3 rounded-full bg-yellow-900 mr-3 md:mr-4">
-                                <FiBell className="text-yellow-300" size={16} />
-                            </div>
-                            <div>
-                                <h2 className="text-xl md:text-2xl font-bold text-white">{pendingInvitesCount}</h2>
-                                <p className="text-xs md:text-sm text-gray-400">Pending Invites</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-gray-800 rounded-lg p-3 md:p-4 shadow border border-gray-700">
-                        <div className="flex items-center">
-                            <div className="p-2 md:p-3 rounded-full bg-purple-900 mr-3 md:mr-4">
-                                <FiBox className="text-purple-300" size={16} />
-                            </div>
-                            <div>
-                                <h2 className="text-xl md:text-2xl font-bold text-white">
-                                    {teamMembers.reduce((total, member) => total + (member.assignedGPTs || 0), 0)}
-                                </h2>
-                                <p className="text-xs md:text-sm text-gray-400">Assigned GPTs</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                {/* Search and Filter */}
-                <div className="mb-4 flex flex-col md:flex-row items-center justify-between gap-4">
-                    {/* Search Bar Container */}
-                    <div className="relative w-full md:w-auto">
-                        <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 flex-shrink-0">
+                <div className="relative flex-grow sm:flex-grow-0 sm:w-64 md:w-72">
+                    <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
                             type="text"
-                            placeholder="Search team members..."
+                        placeholder="Search members..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 w-full md:w-64 rounded-md border border-gray-700 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                        className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                         />
                     </div>
                     
-                    {/* Filter Buttons Container */}
-                    <div className="flex space-x-2 w-full md:w-auto justify-end md:justify-start"> 
-                        <button className="px-2 py-1 rounded-md border border-gray-700 bg-gray-800 text-gray-200 hover:bg-gray-700 flex items-center">
-                            <FiFilter className="mr-2" /> Filter
-                        </button>
-                        
-                        {/* Departments Dropdown */}
-                        <div className="relative">
+                <div className="flex items-center gap-3">
+                    <div className="relative" ref={departmentFilterRef}>
                             <button 
-                                onClick={() => {
-                                    setShowDepartmentsDropdown(!showDepartmentsDropdown);
-                                    setShowStatusDropdown(false);
-                                }}
-                                className="px-3 py-2 rounded-md border border-gray-700 bg-gray-800 text-gray-200 hover:bg-gray-700 text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[90px] xs:max-w-[100px] md:max-w-none"
-                            >
-                                {selectedDepartment}
+                            onClick={() => setShowDepartmentsDropdown(!showDepartmentsDropdown)}
+                            className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        >
+                            <FiFilter size={14} />
+                            <span>{selectedDepartment === 'All Departments' ? 'Department' : selectedDepartment}</span>
+                            <FiChevronDown size={16} className={`transition-transform ${showDepartmentsDropdown ? 'rotate-180' : ''}`} />
                             </button>
-                            
                             {showDepartmentsDropdown && (
-                               <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-10">
-                                   <div className="py-1" role="menu" aria-orientation="vertical">
+                            <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 z-10 overflow-hidden">
                                        {departments.map(dept => (
                                            <button 
                                                key={dept}
-                                               className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                               onClick={() => {
-                                                   setSelectedDepartment(dept);
-                                                   setShowDepartmentsDropdown(false);
-                                               }}
+                                        onClick={() => { setSelectedDepartment(dept); setShowDepartmentsDropdown(false); }}
+                                        className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between ${selectedDepartment === dept ? 'font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                                            >
                                                {dept}
+                                        {selectedDepartment === dept && <FiCheck size={14} />}
                                            </button>
                                        ))}
-                                   </div>
                                </div>
                             )}
                         </div>
-                        
-                        {/* Status Dropdown */}
-                        <div className="relative">
+                    <div className="relative" ref={statusFilterRef}>
                             <button 
-                                onClick={() => {
-                                    setShowStatusDropdown(!showStatusDropdown);
-                                    setShowDepartmentsDropdown(false);
-                                }}
-                                className="px-3 py-2 rounded-md border border-gray-700 bg-gray-800 text-gray-200 hover:bg-gray-700 text-sm"
-                            >
-                                {selectedStatus}
+                            onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                            className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        >
+                            <FiUsers size={14}/>
+                            <span>{selectedStatus}</span>
+                            <FiChevronDown size={16} className={`transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} />
                             </button>
-                            
                             {showStatusDropdown && (
-                                <div className="absolute right-0 mt-2 w-36 rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-10">
-                                    <div className="py-1" role="menu" aria-orientation="vertical">
+                            <div className="absolute left-0 mt-2 w-40 bg-white dark:bg-gray-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 z-10 overflow-hidden">
+                                {['All Status', 'Active', 'Inactive'].map(status => (
                                         <button 
-                                            className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                            onClick={() => {
-                                                setSelectedStatus('All Status');
-                                                setShowStatusDropdown(false);
-                                            }}
-                                        >
-                                            All Status
+                                        key={status}
+                                        onClick={() => { setSelectedStatus(status); setShowStatusDropdown(false); }}
+                                        className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between ${selectedStatus === status ? 'font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                    >
+                                        {status}
+                                        {selectedStatus === status && <FiCheck size={14} />}
                                         </button>
-                                        <button 
-                                            className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                            onClick={() => {
-                                                setSelectedStatus('Active');
-                                                setShowStatusDropdown(false);
-                                            }}
-                                        >
-                                            <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-2"></span>
-                                            Active
-                                        </button>
-                                        <button 
-                                            className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                            onClick={() => {
-                                                setSelectedStatus('Inactive');
-                                                setShowStatusDropdown(false);
-                                            }}
-                                        >
-                                            <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-2"></span>
-                                            Inactive
-                                        </button>
-                                    </div>
+                                ))}
                                 </div>
                             )}
                         </div>
-                    </div>
+
+                                                    <button
+                        onClick={handleInviteMember}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors relative"
+                    >
+                        Invite Member
+                        {pendingInvitesCount > 0 && (
+                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                                {pendingInvitesCount}
+                            </span>
+                        )}
+                                                                </button>
                 </div>
             </div>
             
-            {/* Conditional rendering based on screen size */}
-            {!isMobileView ? (
-                // Desktop Table View
-                <>
-                    {/* Table Header (Fixed) */}
-                    <div className="flex-none px-4 md:px-6">
-                        <div className="bg-gray-900 rounded-t-lg overflow-hidden border border-gray-700 border-b-0">
-                            <table className="min-w-full table-fixed">
-                                <colgroup>
-                                    <col className="w-[20%]" />
-                                    <col className="w-[10%]" />
-                                    <col className="w-[15%]" />
-                                    <col className="w-[13%] hidden md:table-cell" />
-                                    <col className="w-[13%] hidden md:table-cell" />
-                                    <col className="w-[12%]" />
-                                    <col className="w-[8%] hidden sm:table-cell" />
-                                    <col className="w-[9%]" />
-                                </colgroup>
-                                <thead>
-                                    <tr>
-                                        <th scope="col" className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                            Member
+            <div className="flex-1 overflow-y-auto hide-scrollbar -mx-4 sm:-mx-6 px-4 sm:px-6">
+                {isMobileView ? (
+                    <div className="space-y-3">
+                        {filteredMembers.length > 0 ? (
+                            filteredMembers.map(member => (
+                                <MobileTeamMemberCard key={member.id} member={member} />
+                            ))
+                        ) : (
+                            <p className="text-center text-gray-500 dark:text-gray-400 py-8">No team members found matching your criteria.</p>
+                        )}
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead className="bg-gray-50 dark:bg-gray-700/50">
+                                <tr>
+                                    {['Member', 'Role', 'Department', 'GPTs Assigned', 'Status', 'Joined', 'Last Active', ''].map((header) => (
+                                        <th key={header} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                                            {header}
                                         </th>
-                                        <th scope="col" className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                            Role
-                                        </th>
-                                        <th scope="col" className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                            Department
-                                        </th>
-                                        <th scope="col" className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider hidden md:table-cell">
-                                            Joined
-                                        </th>
-                                        <th scope="col" className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider hidden md:table-cell">
-                                            Last Active
-                                        </th>
-                                        <th scope="col" className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                        <th scope="col" className="px-4 md:px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider hidden sm:table-cell">
-                                            GPTs
-                                        </th>
-                                        <th scope="col" className="px-4 md:px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                            Actions
-                                        </th>
+                                    ))}
                                     </tr>
                                 </thead>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    {/* Table Body (Scrollable with hidden scrollbar) */}
-                    <div className="flex-1 px-4 md:px-6 pb-6 overflow-auto hide-scrollbar">
-                        <div className="bg-gray-800 rounded-b-lg shadow border border-gray-700 border-t-0">
-                            {filteredMembers.length === 0 ? (
-                                <div className="p-6 text-center text-gray-400">
-                                    {searchTerm ? 'No members match your search criteria' : 'No team members found'}
-                                </div>
-                            ) : (
-                                <table className="min-w-full table-fixed">
-                                    <colgroup>
-                                        <col className="w-[20%]" />
-                                        <col className="w-[10%]" />
-                                        <col className="w-[15%]" />
-                                        <col className="w-[13%] hidden md:table-cell" />
-                                        <col className="w-[13%] hidden md:table-cell" />
-                                        <col className="w-[12%]" />
-                                        <col className="w-[8%] hidden sm:table-cell" />
-                                        <col className="w-[9%]" />
-                                    </colgroup>
-                                    <tbody className="bg-gray-800 divide-y divide-gray-700">
-                                        {filteredMembers.map((member) => (
-                                            <tr key={member.id} className="hover:bg-gray-700">
-                                                {/* Member column */}
-                                                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                {filteredMembers.length > 0 ? filteredMembers.map((member) => (
+                                    <tr key={member.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                        <td className="px-6 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleViewMemberDetails(member)}>
                                                     <div className="flex items-center">
-                                                        <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 bg-gray-600 rounded-full flex items-center justify-center text-white">
-                                                            {member.name.charAt(0)}
+                                                <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                                                    <FiUser className="text-gray-600 dark:text-gray-300" />
                                                         </div>
-                                                        <div className="ml-3 md:ml-4">
-                                                            <div className="text-xs sm:text-sm font-medium text-white cursor-pointer hover:text-blue-400"
-                                                                 onClick={() => handleViewMemberDetails(member)}>
-                                                                {member.name}
-                                                            </div>
-                                                            <div className="text-xs text-gray-400">
-                                                                {member.email}
-                                                            </div>
+                                                <div className="ml-4">
+                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{member.name}</div>
+                                                    <div className="text-sm text-gray-500 dark:text-gray-400">{member.email}</div>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                
-                                                {/* Role column */}
-                                                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-xs sm:text-sm text-white">
-                                                        {member.role}
-                                                    </div>
-                                                </td>
-                                                
-                                                {/* Department column */}
-                                                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-xs sm:text-sm text-white">
-                                                        {member.department}
-                                                    </div>
-                                                    {member.position && (
-                                                        <div className="text-xs text-gray-400 hidden sm:block">
-                                                            {member.position}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                
-                                                {/* Joined column */}
-                                                <td className="px-4 md:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-400 hidden md:table-cell">
-                                                    <div className="flex items-center">
-                                                        <FiCalendar className="mr-2" size={14} />
-                                                        {member.joined}
-                                                    </div>
-                                                </td>
-                                                
-                                                {/* Last Active column */}
-                                                <td className="px-4 md:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-400 hidden md:table-cell">
-                                                    {member.lastActive}
-                                                </td>
-                                                
-                                                {/* Status column */}
-                                                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${member.status === 'Active' ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'}`}>
-                                                        <span className={`inline-block w-2 h-2 rounded-full mr-1.5 self-center ${member.status === 'Active' ? 'bg-green-400' : 'bg-red-400'}`}></span>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{member.role}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{member.department}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-700 dark:text-gray-300">{member.assignedGPTs}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                                member.status === 'Active'
+                                                    ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                                                    : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300'
+                                            }`}>
                                                         {member.status}
                                                     </span>
                                                 </td>
-                                                
-                                                {/* GPTs column - centered now */}
-                                                <td className="px-4 md:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-white hidden sm:table-cell text-center">
-                                                    {member.assignedGPTs}
-                                                </td>
-                                                
-                                                {/* Actions column */}
-                                                <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{member.joined}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{member.lastActive}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
                                                     <button
-                                                        onClick={() => toggleActionsMenu(member.id)}
-                                                        className="text-gray-400 hover:text-gray-300"
+                                                onClick={(e) => { e.stopPropagation(); toggleActionsMenu(member.id); }}
+                                                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                data-member-id={member.id}
                                                     >
-                                                        <FiMoreVertical />
+                                                <FiMoreVertical size={18} />
                                                     </button>
-                                                    
-                                                    {showActionsMenu === member.id && (
-                                                        <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50">
-                                                            <div className="py-1" role="menu" aria-orientation="vertical">
-                                                                <button
-                                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                                                    onClick={() => handleEmailTeamMember(member.email)}
-                                                                >
-                                                                    <FiMail className="inline mr-2" />
-                                                                    Email
-                                                                </button>
-                                                                <button
-                                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                                                    onClick={() => handleEditPermissions(member)}
-                                                                >
-                                                                    <FiEdit className="inline mr-2" />
-                                                                    Edit permissions
-                                                                </button>
-                                                                <button
-                                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                                                    onClick={() => handleAssignGpts(member)}
-                                                                >
-                                                                    <FiBox className="inline mr-2" />
-                                                                    Assign GPTs
-                                                                </button>
-                                                                <button
-                                                                    className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-600"
-                                                                    onClick={() => handleRemoveTeamMember(member.id)}
-                                                                >
-                                                                    <FiTrash2 className="inline mr-2" />
-                                                                    Remove
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    )}
                                                 </td>
                                             </tr>
-                                        ))}
+                                )) : (
+                                    <tr>
+                                        <td colSpan="8" className="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                                            No team members found matching your criteria.
+                                        </td>
+                                    </tr>
+                                )}
                                     </tbody>
                                 </table>
-                            )}
-                        </div>
                     </div>
-                </>
-            ) : (
-                // Mobile Card View with hidden scrollbar
-                <div className="flex-1 px-4 pb-6 overflow-auto hide-scrollbar">
-                    {filteredMembers.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-gray-400 text-center p-4">
-                            <p className="text-lg mb-4">
-                                {searchTerm ? `No members matching "${searchTerm}"` : "No team members found"}
-                            </p>
-                            <button
-                                onClick={handleInviteMember}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded-lg text-white"
-                            >
-                                <FiUsers />
-                                <span>Add your first team member</span>
-                            </button>
-                        </div>
-                    ) : (
-                        filteredMembers.map(member => (
-                            <MobileTeamMemberCard key={member.id} member={member} />
-                        ))
                     )}
                 </div>
-            )}
             
-            {/* Modal Components */}
-            {showAssignGptsModal && (
+            {/* Render action menus outside of the table completely */}
+            {showActionsMenu && filteredMembers.map((member) => (
+                member.id === showActionsMenu && (
+                    <div 
+                        key={`menu-${member.id}`}
+                        className="fixed z-50" 
+                        style={{ 
+                            top: `${document.querySelector(`[data-member-id="${member.id}"]`)?.getBoundingClientRect().bottom + window.scrollY}px`,
+                            left: `${document.querySelector(`[data-member-id="${member.id}"]`)?.getBoundingClientRect().right - 170 + window.scrollX}px` 
+                        }}
+                    >
+                        <div
+                            ref={actionsMenuRef}
+                            className="w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 overflow-hidden"
+                        >
+                            <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                                <button onClick={() => handleAssignGpts(member)} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2">
+                                    <FiBox size={14} /> Assign GPTs
+                                </button>
+                                <button onClick={() => handleEditPermissions(member)} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2">
+                                    <FiEdit size={14} /> Edit Permissions
+                                </button>
+                                <button onClick={() => handleEmailTeamMember(member.email)} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2">
+                                    <FiMail size={14} /> Send Email
+                                </button>
+                                <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
+                                <button onClick={() => handleRemoveTeamMember(member.id)} className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2">
+                                    <FiTrash2 size={14} /> Remove Member
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            ))}
+
+            {/* Modals */}
+            {showAssignGptsModal && selectedMemberForGpts && (
                 <AssignGptsModal 
                     isOpen={showAssignGptsModal}
-                    onClose={() => {
-                        setShowAssignGptsModal(false);
-                        handleGptAssignmentChange();
-                    }}
+                    onClose={() => setShowAssignGptsModal(false)}
                     teamMember={selectedMemberForGpts}
+                    onAssignmentChange={handleGptAssignmentChange}
                 />
             )}
-            {showDetailsModal && (
+            {showDetailsModal && selectedMemberForDetails && (
                 <TeamMemberDetailsModal 
                     isOpen={showDetailsModal}
                     onClose={() => setShowDetailsModal(false)}
                     member={selectedMemberForDetails}
                 />
             )}
+            {showInviteModal && (
             <InviteTeamMemberModal
                 isOpen={showInviteModal}
                 onClose={() => setShowInviteModal(false)}
+                    onInviteSent={() => {
+                        fetchUsers();
+                        setPendingInvitesCount(prev => prev + 1);
+                    }}
             />
-            {showEditPermissionsModal && (
+            )}
+            {showEditPermissionsModal && selectedMemberForPermissions && (
                 <EditPermissionsModal
                     isOpen={showEditPermissionsModal}
                     onClose={() => setShowEditPermissionsModal(false)}
@@ -891,10 +630,5 @@ const TeamManagement = () => {
         </div>
     );
 };
-
-// Sample data function should ideally be outside the component
-function getSampleTeamData() {
-    // ... sample data ...
-}
 
 export default TeamManagement; 

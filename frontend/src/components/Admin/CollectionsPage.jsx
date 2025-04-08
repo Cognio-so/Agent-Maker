@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import axios from 'axios';
-import { FiEdit, FiTrash2, FiSearch, FiChevronDown, FiChevronUp, FiPlus } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiSearch, FiChevronDown, FiChevronUp, FiPlus, FiInfo } from 'react-icons/fi';
 import { SiOpenai, SiGooglegemini } from 'react-icons/si';
 import { FaRobot } from 'react-icons/fa6';
 import { BiLogoMeta } from 'react-icons/bi';
 import { RiOpenaiFill } from 'react-icons/ri';
 import { useNavigate } from 'react-router-dom';
 import { axiosInstance } from '../../api/axiosInstance';
+import { useTheme } from '../../context/ThemeContext';
+import { toast } from 'react-toastify';
 
 // Model icons mapping - moved outside component to prevent recreation
 const modelIcons = {
@@ -17,34 +19,34 @@ const modelIcons = {
     'llama': <BiLogoMeta className="text-blue-500" size={18} />
 };
 
-// Memoized GPT card component
-const GptCard = memo(({ gpt, onDelete, onEdit, formatDate, onNavigate }) => (
+// Memoized GPT card component with theme styles
+const GptCard = memo(({ gpt, onDelete, onEdit, formatDate, onNavigate, isDarkMode }) => (
     <div 
         key={gpt._id} 
-        className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-gray-600 transition-all shadow-lg hover:shadow-xl flex flex-col cursor-pointer"
+        className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-blue-400/50 dark:hover:border-gray-600 transition-all shadow-md hover:shadow-lg flex flex-col cursor-pointer group"
         onClick={() => onNavigate(`/admin/chat/${gpt._id}`)}
     >
-        <div className="h-24 sm:h-32 bg-gradient-to-br from-gray-700 to-gray-900 relative flex-shrink-0">
+        <div className="h-24 sm:h-32 bg-gradient-to-br from-gray-100 to-gray-300 dark:from-gray-700 dark:to-gray-900 relative flex-shrink-0 overflow-hidden">
             {gpt.imageUrl ? (
                 <img 
                     src={gpt.imageUrl} 
                     alt={gpt.name} 
-                    className="w-full h-full object-cover opacity-70"
+                    className="w-full h-full object-cover opacity-80 dark:opacity-70 group-hover:scale-105 transition-transform duration-300"
                     loading="lazy"
                 />
             ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900/50 to-purple-900/50">
-                    <span className="text-3xl sm:text-4xl text-white/30">{gpt.name.charAt(0)}</span>
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50/50 to-purple-100/50 dark:from-blue-900/30 dark:to-purple-900/30">
+                    <span className={`text-3xl sm:text-4xl ${isDarkMode ? 'text-white/30' : 'text-gray-500/40'}`}>{gpt.name.charAt(0)}</span>
                 </div>
             )}
             
-            <div className="absolute top-2 right-2 flex gap-1.5">
+            <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                 <button 
                     onClick={(e) => {
                         e.stopPropagation();
                         onEdit(gpt._id);
                     }}
-                    className="p-1.5 sm:p-2 bg-gray-900/70 rounded-full hover:bg-blue-700/80 transition-colors"
+                    className="p-1.5 sm:p-2 bg-white/80 dark:bg-gray-900/70 text-gray-700 dark:text-gray-200 rounded-full hover:bg-blue-500 hover:text-white dark:hover:bg-blue-700/80 transition-colors shadow"
                     title="Edit GPT"
                 >
                     <FiEdit size={14} />
@@ -54,7 +56,7 @@ const GptCard = memo(({ gpt, onDelete, onEdit, formatDate, onNavigate }) => (
                         e.stopPropagation();
                         onDelete(gpt._id);
                     }}
-                    className="p-1.5 sm:p-2 bg-gray-900/70 rounded-full hover:bg-red-700/80 transition-colors"
+                    className="p-1.5 sm:p-2 bg-white/80 dark:bg-gray-900/70 text-gray-700 dark:text-gray-200 rounded-full hover:bg-red-500 hover:text-white dark:hover:bg-red-700/80 transition-colors shadow"
                     title="Delete GPT"
                 >
                     <FiTrash2 size={14} />
@@ -64,18 +66,18 @@ const GptCard = memo(({ gpt, onDelete, onEdit, formatDate, onNavigate }) => (
         
         <div className="p-3 sm:p-4 flex flex-col flex-grow">
             <div className="flex items-start justify-between mb-1.5 sm:mb-2">
-                <h3 className="font-semibold text-base sm:text-lg line-clamp-1">{gpt.name}</h3>
-                <div className="flex items-center flex-shrink-0 gap-1 bg-gray-700 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs">
-                    {React.cloneElement(modelIcons[gpt.model] || <FaRobot />, { size: 12 })}
+                <h3 className="font-semibold text-base sm:text-lg line-clamp-1 text-gray-900 dark:text-white">{gpt.name}</h3>
+                <div className="flex items-center flex-shrink-0 gap-1 bg-gray-100 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs text-gray-600 dark:text-gray-300">
+                    {React.cloneElement(modelIcons[gpt.model] || <FaRobot className="text-gray-500" />, { size: 12 })}
                     <span className="hidden sm:inline">{gpt.model}</span>
                 </div>
             </div>
             
-            <p className="text-gray-300 text-xs sm:text-sm h-10 sm:h-12 line-clamp-2 sm:line-clamp-3 mb-3">
+            <p className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm h-10 sm:h-12 line-clamp-2 sm:line-clamp-3 mb-3">
                 {gpt.description}
             </p>
             
-            <div className="mt-auto pt-2 border-t border-gray-700 text-[10px] sm:text-xs text-gray-400 flex justify-between items-center">
+            <div className="mt-auto pt-2 border-t border-gray-100 dark:border-gray-700 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 flex justify-between items-center">
                 <span>Created: {formatDate(gpt.createdAt)}</span>
                 {gpt.knowledgeFiles?.length > 0 && (
                     <span className="whitespace-nowrap">{gpt.knowledgeFiles.length} {gpt.knowledgeFiles.length === 1 ? 'file' : 'files'}</span>
@@ -93,26 +95,32 @@ const CollectionsPage = () => {
     const [sortOption, setSortOption] = useState('newest');
     const [showSortOptions, setShowSortOptions] = useState(false);
     const sortDropdownRef = useRef(null);
+    const { isDarkMode } = useTheme();
     const navigate = useNavigate();
 
-    // Memoized fetchCustomGpts function
+    // Memoized fetchCustomGpts function with error toast
     const fetchCustomGpts = useCallback(async () => {
         try {
             setLoading(true);
+            setError(null); // Clear previous errors
             const response = await axiosInstance.get(`/api/custom-gpts`, { withCredentials: true });
-            
-            if (response.data.success) {
+
+            if (response.data.success && response.data.customGpts) { // Check customGpts existence
                 setCustomGpts(response.data.customGpts);
             } else {
-                setError("Failed to fetch custom GPTs");
+                const message = response.data.message || "Failed to fetch custom GPTs: Invalid response";
+                setError(message);
+                toast.error(message);
             }
         } catch (err) {
             console.error("Error fetching custom GPTs:", err);
-            setError("Error connecting to server");
+             const message = err.response?.data?.message || "Error connecting to server";
+             setError(message);
+            toast.error(message);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, []); // Removed toast dependency, it's stable
 
     useEffect(() => {
         fetchCustomGpts();
@@ -132,24 +140,38 @@ const CollectionsPage = () => {
         };
     }, [handleClickOutside]);
 
-    // Memoized event handlers
+    // Memoized event handlers with toast notifications
     const handleDelete = useCallback(async (id) => {
         if (window.confirm("Are you sure you want to delete this GPT? This action cannot be undone.")) {
+            // Optimistic UI update (optional but good UX)
+            // const originalGpts = [...customGpts];
+            // setCustomGpts(prev => prev.filter(gpt => gpt._id !== id));
+            setLoading(true); // Show loading state during delete
+
             try {
-                setLoading(true);
                 const response = await axiosInstance.delete(`/api/custom-gpts/${id}`, { withCredentials: true });
-                
+
                 if (response.data.success) {
-                    setCustomGpts(prev => prev.filter(gpt => gpt._id !== id));
-                }
+                     toast.success(`GPT deleted successfully.`);
+                    // Refetch or filter state (refetch is simpler if optimistic UI wasn't done)
+                     fetchCustomGpts(); // Refetch the list
+                 } else {
+                     const message = response.data.message || "Failed to delete GPT";
+                     toast.error(message);
+                    // Revert optimistic update if done
+                    // setCustomGpts(originalGpts);
+                 }
             } catch (err) {
                 console.error("Error deleting custom GPT:", err);
-                alert("Failed to delete GPT");
+                 const message = err.response?.data?.message || "Error deleting GPT";
+                 toast.error(message);
+                 // Revert optimistic update if done
+                 // setCustomGpts(originalGpts);
             } finally {
-                setLoading(false);
-            }
+                 setLoading(false);
+             }
         }
-    }, []);
+    }, [fetchCustomGpts]); // Add fetchCustomGpts dependency
 
     const handleEdit = useCallback((id) => {
         navigate(`/admin/edit-gpt/${id}`);
@@ -189,125 +211,130 @@ const CollectionsPage = () => {
     const filteredGpts = useMemo(() => {
         return customGpts
             .filter(gpt => {
+                // Handle potential undefined fields gracefully
+                 if (!gpt || !gpt.name || !gpt.description || !gpt.model) return false;
                 if (!searchTerm) return true;
                 const searchLower = searchTerm.toLowerCase();
                 return (
-                    gpt.name.toLowerCase().includes(searchLower) || 
+                    gpt.name.toLowerCase().includes(searchLower) ||
                     gpt.description.toLowerCase().includes(searchLower) ||
                     gpt.model.toLowerCase().includes(searchLower)
                 );
             })
             .sort((a, b) => {
+                // Handle potential missing dates
+                 const dateA = a.createdAt ? new Date(a.createdAt) : 0;
+                 const dateB = b.createdAt ? new Date(b.createdAt) : 0;
+                 const nameA = a.name || '';
+                 const nameB = b.name || '';
+
                 switch (sortOption) {
-                    case 'newest':
-                        return new Date(b.createdAt) - new Date(a.createdAt);
-                    case 'oldest':
-                        return new Date(a.createdAt) - new Date(b.createdAt);
-                    case 'alphabetical':
-                        return a.name.localeCompare(b.name);
-                    default:
-                        return new Date(b.createdAt) - new Date(a.createdAt);
+                    case 'newest': return dateB - dateA;
+                    case 'oldest': return dateA - dateB;
+                    case 'alphabetical': return nameA.localeCompare(nameB);
+                    default: return dateB - dateA;
                 }
             });
     }, [customGpts, searchTerm, sortOption]);
 
-    // Simplified loading indicator
+    // Loading State
     if (loading && customGpts.length === 0) {
         return (
-            <div className="flex items-center justify-center h-full text-white">
+             // Apply theme colors
+            <div className="flex items-center justify-center h-full bg-white dark:bg-black text-gray-600 dark:text-gray-400">
                 <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
             </div>
         );
     }
 
+    // Error State
+    if (error && customGpts.length === 0) {
+        return (
+            // Apply theme colors
+            <div className="flex flex-col items-center justify-center h-full bg-white dark:bg-black text-gray-600 dark:text-gray-400 p-6">
+                <FiInfo size={40} className="mb-4 text-red-500" />
+                <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">Loading Failed</h2>
+                <p className="text-center mb-4">{error}</p>
+                <button
+                    onClick={fetchCustomGpts}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                    Retry
+                </button>
+            </div>
+        );
+    }
+
     return (
-        <div className="flex flex-col h-full bg-black text-white p-4 sm:p-6 overflow-hidden">
+        // Apply theme colors to main container
+        <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 text-black dark:text-white p-4 sm:p-6 overflow-hidden">
+            {/* Header */}
             <div className="mb-4 md:mb-6 flex-shrink-0 text-center sm:text-left">
-                <h1 className="text-xl sm:text-2xl font-bold">Collections</h1>
+                {/* Apply theme text color */}
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Collections</h1>
+                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your custom GPTs</p>
             </div>
             
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 md:mb-6 gap-4 flex-shrink-0">
+            {/* Controls: Search, Sort, Create */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 md:mb-6 gap-3 md:gap-4 flex-shrink-0">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
+                    {/* Search Input */}
                     <div className="relative flex-grow sm:flex-grow-0">
-                        <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                         {/* Apply theme colors */}
+                         <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
                             type="text"
                             placeholder="Search GPTs..."
                             value={searchTerm}
                             onChange={handleSearchChange}
-                            className="w-full sm:w-52 md:w-64 pl-10 pr-4 py-2 rounded-lg bg-gray-700 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm"
+                            className="w-full sm:w-52 md:w-64 pl-10 pr-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                         />
                     </div>
                     
+                    {/* Sort Dropdown */}
                     <div className="relative" ref={sortDropdownRef}>
-                        <button 
+                        <button
                             onClick={toggleSortOptions}
-                            className="flex items-center justify-between w-full sm:w-36 px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white text-sm"
+                             // Apply theme colors
+                             className="flex items-center justify-between w-full sm:w-36 px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
                         >
                             <span className="truncate">Sort: {sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}</span>
                             {showSortOptions ? <FiChevronUp size={16}/> : <FiChevronDown size={16}/>}
                         </button>
-                        
+                        {/* Sort Options Menu */}
                         {showSortOptions && (
-                            <div className="absolute z-10 w-full sm:w-36 mt-1 bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden text-sm">
-                                <button 
-                                    className={`block w-full text-left px-3 py-2 hover:bg-gray-700 transition-colors ${sortOption === 'newest' ? 'bg-blue-600' : ''}`}
-                                    onClick={() => handleSortOptionSelect('newest')}
-                                >
-                                    Newest
-                                </button>
-                                <button 
-                                    className={`block w-full text-left px-3 py-2 hover:bg-gray-700 transition-colors ${sortOption === 'oldest' ? 'bg-blue-600' : ''}`}
-                                    onClick={() => handleSortOptionSelect('oldest')}
-                                >
-                                    Oldest
-                                </button>
-                                <button 
-                                    className={`block w-full text-left px-3 py-2 hover:bg-gray-700 transition-colors ${sortOption === 'alphabetical' ? 'bg-blue-600' : ''}`}
-                                    onClick={() => handleSortOptionSelect('alphabetical')}
-                                >
-                                    Alphabetical
-                                </button>
+                            // Apply theme colors
+                            <div className="absolute left-0 mt-2 w-36 bg-white dark:bg-gray-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 z-10 overflow-hidden">
+                                {['newest', 'oldest', 'alphabetical'].map((option) => (
+                                    <button
+                                        key={option}
+                                        onClick={() => handleSortOptionSelect(option)}
+                                        // Apply theme colors
+                                        className={`w-full text-left px-4 py-2 text-sm ${sortOption === option ? 'font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                    >
+                                        {option.charAt(0).toUpperCase() + option.slice(1)}
+                                    </button>
+                                ))}
                             </div>
                         )}
                     </div>
-                    
-                    <button
-                        onClick={handleCreateNew}
-                        className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 px-3 py-2 rounded-lg text-white font-medium transition-all text-sm whitespace-nowrap"
-                    >
-                        <FiPlus size={16}/>
-                        <span>Create New</span>
-                    </button>
                 </div>
+                
+                {/* Create Button */}
+                <button
+                    onClick={handleCreateNew}
+                    // Apply theme colors (consistent blue button)
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors flex-shrink-0 whitespace-nowrap"
+                >
+                    <FiPlus size={18} /> Create New GPT
+                </button>
             </div>
             
-            <div className="flex-1 overflow-y-auto pb-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                {error ? (
-                    <div className="flex flex-col items-center justify-center h-full text-red-400">
-                        <p className="text-lg mb-4">{error}</p>
-                        <button
-                            onClick={fetchCustomGpts}
-                            className="px-4 py-2 bg-blue-600 rounded-lg text-white"
-                        >
-                            Try Again
-                        </button>
-                    </div>
-                ) : filteredGpts.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-400 text-center">
-                        <p className="text-lg mb-4">
-                            {searchTerm ? `No GPTs matching "${searchTerm}"` : "You haven't created any GPTs yet"}
-                        </p>
-                        <button
-                            onClick={handleCreateNew}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded-lg text-white"
-                        >
-                            <FiPlus />
-                            <span>Create your first GPT</span>
-                        </button>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {/* GPT Grid */}
+             {/* Apply theme scrollbar styling */}
+            <div className="flex-1 overflow-y-auto pb-4 custom-scrollbar-dark dark:custom-scrollbar">
+                {filteredGpts.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {filteredGpts.map((gpt) => (
                             <GptCard 
                                 key={gpt._id}
@@ -316,8 +343,27 @@ const CollectionsPage = () => {
                                 onEdit={handleEdit} 
                                 formatDate={formatDate}
                                 onNavigate={handleNavigate}
+                                isDarkMode={isDarkMode} // Pass theme state
                             />
                         ))}
+                    </div>
+                ) : (
+                     // Empty State
+                    // Apply theme colors
+                    <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-400 pt-10">
+                        <FaRobot size={48} className="mb-4 text-gray-400 dark:text-gray-500" />
+                        <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">No GPTs Found</h3>
+                        <p className="max-w-xs mt-1">
+                            {searchTerm ? `No GPTs match your search "${searchTerm}".` : "You haven't created any custom GPTs yet."}
+                        </p>
+                         {!searchTerm && (
+                             <button
+                                onClick={handleCreateNew}
+                                className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+                            >
+                                <FiPlus size={18} /> Create Your First GPT
+                            </button>
+                         )}
                     </div>
                 )}
             </div>
@@ -325,4 +371,4 @@ const CollectionsPage = () => {
     );
 };
 
-export default memo(CollectionsPage); 
+export default CollectionsPage; 

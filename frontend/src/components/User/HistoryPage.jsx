@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
-import { FiSearch, FiMessageSquare, FiClock, FiCalendar, FiTrash2, FiXCircle } from 'react-icons/fi';
+import { FiSearch, FiMessageSquare, FiClock, FiCalendar, FiTrash2, FiXCircle, FiExternalLink } from 'react-icons/fi';
 import { IoEllipse } from 'react-icons/io5';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
@@ -63,13 +63,13 @@ const ConversationItem = memo(({ conv, formatTimestamp, onContinue, onDelete, is
     <div 
         className={`p-4 rounded-lg border mb-3 cursor-pointer transition-all group ${
             isDarkMode 
-                ? 'bg-gray-800 border-gray-700 hover:bg-gray-700/70 hover:border-gray-600' 
+                ? 'bg-gray-800/50 border-gray-700 hover:bg-gray-700/70 hover:border-gray-600' 
                 : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
         }`}
         onClick={() => onContinue(conv)}
     >
         <div className="flex items-center justify-between mb-2">
-            <h3 className={`font-semibold truncate mr-4 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{conv.gptName}</h3>
+            <h3 className={`font-semibold truncate mr-4 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{conv.gptName}</h3>
             <span className={`text-xs flex-shrink-0 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                 {formatTimestamp(conv.timestamp)}
             </span>
@@ -79,8 +79,10 @@ const ConversationItem = memo(({ conv, formatTimestamp, onContinue, onDelete, is
         </p>
         <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-3">
-                <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>{conv.messageCount} messages</span>
-                <span className={`px-1.5 py-0.5 rounded ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-200 text-gray-600'}`}>
+                <span className={`flex items-center gap-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <FiMessageSquare size={13}/> {conv.messageCount} msgs
+                </span>
+                <span className={`px-1.5 py-0.5 rounded flex items-center gap-1 ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-600'}`}>
                     {conv.model}
                 </span>
             </div>
@@ -96,6 +98,7 @@ const ConversationItem = memo(({ conv, formatTimestamp, onContinue, onDelete, is
                 <FiTrash2 size={16} />
             </button>
         </div>
+        <FiExternalLink className={`absolute top-3 right-3 opacity-0 group-hover:opacity-50 transition-opacity ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} size={14}/>
     </div>
 ));
 
@@ -144,9 +147,17 @@ const HistoryPage = () => {
             const now = new Date();
             let cutoffDate;
             switch (filterPeriod) {
-                case 'today': cutoffDate = new Date(now.setHours(0, 0, 0, 0)); break;
-                case 'week': cutoffDate = new Date(now.setDate(now.getDate() - 7)); break;
-                case 'month': cutoffDate = new Date(now.setMonth(now.getMonth() - 1)); break;
+                case 'today': cutoffDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()); break;
+                case 'week': {
+                    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    cutoffDate = new Date(startOfToday.setDate(startOfToday.getDate() - 7));
+                    break;
+                }
+                case 'month': {
+                    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    cutoffDate = new Date(startOfToday.setMonth(startOfToday.getMonth() - 1));
+                    break;
+                }
                 default: cutoffDate = null;
             }
             if (cutoffDate) {
@@ -165,7 +176,7 @@ const HistoryPage = () => {
             const diffMs = now - date;
             const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
             
-            if (diffDays === 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            if (diffDays === 0) return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
             if (diffDays === 1) return 'Yesterday';
             if (diffDays < 7) return `${diffDays} days ago`;
             return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
@@ -201,7 +212,12 @@ const HistoryPage = () => {
     const handleFilterChange = useCallback((e) => setFilterPeriod(e.target.value), []);
 
     const handleRetry = useCallback(() => {
-        window.location.reload();
+        setLoading(true);
+        setError(null);
+        setTimeout(() => {
+            setConversations(mockConversations);
+            setLoading(false);
+        }, 500);
     }, []);
 
     if (loading && conversations.length === 0 && !error) {
@@ -225,7 +241,7 @@ const HistoryPage = () => {
             
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4 flex-shrink-0">
                 <div className="relative w-full sm:w-auto sm:flex-1 max-w-lg">
-                    <FiSearch className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                    <FiSearch className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} size={18} />
                     <input
                         type="text"
                         placeholder="Search conversations (name, message, summary)..."
@@ -240,16 +256,16 @@ const HistoryPage = () => {
                 </div>
                 
                 <div className="flex items-center gap-2 self-end sm:self-center">
-                    <FiCalendar className={isDarkMode ? 'text-gray-400' : 'text-gray-500'} size={18} />
+                    <FiCalendar className={isDarkMode ? 'text-gray-400' : 'text-gray-500'} size={16} />
                     <select
                         value={filterPeriod}
                         onChange={handleFilterChange}
-                        className={`border rounded-lg py-2 px-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base appearance-none pr-8 ${
+                        className={`border rounded-lg py-1.5 px-3 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm appearance-none pr-8 ${
                             isDarkMode 
                                 ? 'bg-gray-700 border-gray-600 text-white' 
                                 : 'bg-white border-gray-300 text-gray-900'
                         }`}
-                        style={{ backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="${isDarkMode ? 'white' : 'black'}" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>')`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5em 1.5em' }}
+                        style={{ backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="${isDarkMode ? 'white' : 'black'}" height="20" viewBox="0 0 20 20" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>')`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.5rem center', backgroundSize: '1em 1em' }}
                     >
                         <option value="all">All Time</option>
                         <option value="today">Today</option>
@@ -259,8 +275,27 @@ const HistoryPage = () => {
                 </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto no-scrollbar">
-                {error ? (
+            <div className="flex-1 overflow-y-auto no-scrollbar pb-4">
+                {loading ? (
+                    <div className="space-y-3 animate-pulse">
+                        {[...Array(4)].map((_, i) => (
+                            <div key={i} className={`p-4 rounded-lg border ${isDarkMode ? 'bg-gray-800/50 border-gray-700' : 'bg-white border-gray-200'}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className={`h-4 rounded w-1/3 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`}></div>
+                                    <div className={`h-3 rounded w-1/4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`}></div>
+                                </div>
+                                <div className={`h-3 rounded w-full mb-3 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`}></div>
+                                <div className="flex items-center justify-between text-xs">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`h-3 rounded w-16 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`}></div>
+                                        <div className={`h-4 px-4 py-0.5 rounded ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
+                                    </div>
+                                    <div className={`h-6 w-6 rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : error ? (
                     <div className={`flex flex-col items-center justify-center h-full text-center ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
                         <FiXCircle size={40} className="mb-4 opacity-70"/>
                         <p className="text-lg mb-4">{error}</p>
@@ -313,9 +348,9 @@ const HistoryPage = () => {
             </div>
 
             {showDeleteConfirm && selectedConversation && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                    <div className={`p-6 rounded-lg shadow-xl w-full max-w-sm ${
-                        isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white'
+                <div className="fixed inset-0 bg-black/60 dark:bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className={`p-6 rounded-lg shadow-xl w-full max-w-sm border ${
+                        isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
                     }`}>
                         <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Delete Conversation?</h3>
                         <p className={`text-sm mb-5 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
@@ -327,7 +362,7 @@ const HistoryPage = () => {
                                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                                     isDarkMode 
                                         ? 'bg-gray-600 hover:bg-gray-500 text-white' 
-                                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300'
                                 }`}
                             >
                                 Cancel

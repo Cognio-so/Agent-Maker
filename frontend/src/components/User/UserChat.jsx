@@ -150,7 +150,7 @@ const UserChat = () => {
         <div className={`flex flex-col h-screen overflow-hidden transition-colors duration-300 ${
             isDarkMode ? 'bg-black text-white' : 'bg-gray-100 text-gray-900'
         }`}>
-            <div className={`flex-shrink-0 px-4 py-3 flex items-center justify-between border-b ${
+            <div className={`flex-shrink-0 px-4 py-3 flex items-center justify-between  ${
                 isDarkMode ? 'bg-black border-gray-800' : 'bg-gray-100 border-gray-200'
             }`}>
                 <div className="w-10 h-10">
@@ -166,11 +166,7 @@ const UserChat = () => {
                         </button>
                     )}
                 </div>
-                <div className="text-center">
-                    <h2 className={`text-lg font-semibold truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {isFetchingGpt ? 'Loading...' : (gptData?.name || 'AI Agent Chat')}
-                    </h2>
-                </div>
+                
                 <div className="relative">
                     <button 
                         onClick={toggleProfile}
@@ -374,7 +370,7 @@ const UserChat = () => {
                 </div>
             </div>
 
-            <div className={`flex-shrink-0 p-3 border-t ${isDarkMode ? 'bg-black border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
+            <div className={`flex-shrink-0 p-3  ${isDarkMode ? 'bg-black border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
                 <div className="w-full max-w-3xl mx-auto">
                     <ChatInput 
                         onSubmit={handleChatSubmit} 

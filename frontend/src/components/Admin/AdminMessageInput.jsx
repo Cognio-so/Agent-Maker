@@ -1,20 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { IoSendSharp } from 'react-icons/io5';
 import { HiMiniPaperClip } from 'react-icons/hi2';
+import { useTheme } from '../../context/ThemeContext';
 
-const AdminMessageInput = ({ onSubmit, onFileUpload }) => {
+const AdminMessageInput = ({ onSubmit, onFileUpload, isLoading, currentGptName }) => {
     const [inputMessage, setInputMessage] = useState('');
     const textareaRef = useRef(null);
     const fileInputRef = useRef(null);
+    const { isDarkMode } = useTheme();
 
     // More robust auto-resize textarea
     const resizeTextarea = () => {
         if (textareaRef.current) {
-            // Reset height to get accurate scrollHeight
-            textareaRef.current.style.height = '0px';
+            // Temporarily reset height to get accurate scrollHeight
+            textareaRef.current.style.height = 'auto'; // Reset first
             const scrollHeight = textareaRef.current.scrollHeight;
-            // Apply minimum height for small content
-            textareaRef.current.style.height = Math.max(40, scrollHeight) + 'px';
+             // Define min and max heights (adjust as needed)
+             const minHeight = 40; // Example min height
+             const maxHeight = 160; // Example max height (approx 6 lines)
+            // Calculate new height, clamped between min and max
+            const newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
+            textareaRef.current.style.height = newHeight + 'px';
+             // Add overflow-y: auto if maxHeight is reached
+             textareaRef.current.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
         }
     };
 
@@ -31,17 +39,17 @@ const AdminMessageInput = ({ onSubmit, onFileUpload }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (inputMessage.trim()) {
-            onSubmit(inputMessage);
-            setInputMessage('');
-            
-            // Reset height after clearing input
-            setTimeout(() => {
-                if (textareaRef.current) {
-                    textareaRef.current.style.height = '40px'; // Reset to min-height
-                }
-            }, 0);
-        }
+         // Prevent submission if loading or input is empty
+         if (isLoading || !inputMessage.trim()) return;
+        onSubmit(inputMessage);
+        setInputMessage('');
+        // Reset height after submitting
+        setTimeout(() => {
+            if (textareaRef.current) {
+                 textareaRef.current.style.height = '40px'; // Reset to min-height
+                 textareaRef.current.style.overflowY = 'hidden'; // Reset overflow
+            }
+        }, 0);
     };
 
     // Function to handle click on the paperclip icon
@@ -61,58 +69,67 @@ const AdminMessageInput = ({ onSubmit, onFileUpload }) => {
     };
 
     return (
-        <div className="w-full">
+        <div className="w-full p-2 sm:p-4 bg-white dark:bg-black">
+            {currentGptName && (
+                <div className="text-xs text-center text-gray-400 dark:text-gray-500 mb-1.5">
+                    Chatting with: <span className="font-medium text-gray-600 dark:text-gray-400">{currentGptName}</span>
+                </div>
+            )}
             <form onSubmit={handleSubmit}>
-                <div className="bg-[#1e1e1e] rounded-2xl sm:rounded-3xl shadow-md">
-                    <div className="flex flex-col px-3 sm:px-4 py-3 sm:py-4 rounded-2xl sm:rounded-3xl border border-gray-700/50">
-                        {/* Textarea field that grows with content */}
+                <div className="bg-gray-100 dark:bg-[#1e1e1e] rounded-xl sm:rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700/50 relative group focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+                    <div className="flex flex-col px-3 sm:px-4 py-2 sm:py-3">
                         <textarea
                             ref={textareaRef}
-                            className="w-full bg-transparent border-0 outline-none text-white resize-none overflow-hidden min-h-[40px] max-h-[120px] sm:max-h-[200px] text-sm sm:text-base" 
-                            placeholder="Ask anything ..."
+                            className="w-full bg-transparent border-0 outline-none text-black dark:text-white resize-none overflow-hidden min-h-[40px] text-sm sm:text-base placeholder-gray-500 dark:placeholder-gray-400 custom-scrollbar-dark dark:custom-scrollbar"
+                            placeholder="Ask anything..."
                             value={inputMessage}
                             onChange={(e) => setInputMessage(e.target.value)}
                             rows={1}
+                            disabled={isLoading}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.shiftKey) {
                                     e.preventDefault();
                                     handleSubmit(e);
                                 }
                             }}
+                            style={{ height: '40px' }}
                         />
-                        
-                        {/* Icons below the text area */}
-                        <div className="flex justify-between items-center mt-2 sm:mt-3">
-                            {/* Hidden File Input */}
-                            <input 
+
+                        <div className="flex justify-between items-center mt-1.5 sm:mt-2">
+                            <input
                                 type="file"
                                 ref={fileInputRef}
                                 onChange={handleFileChange}
                                 style={{ display: 'none' }}
+                                multiple
+                                disabled={isLoading}
                             />
 
-                            {/* Upload Icon Button */}
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 onClick={handleUploadClick}
-                                className="text-gray-400 rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:bg-gray-700/50 transition-colors"
+                                className={`text-gray-400 dark:text-gray-500 rounded-full w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700/50 transition-colors ${isLoading ? 'cursor-not-allowed opacity-50' : ''}`}
                                 aria-label="Attach file"
+                                disabled={isLoading}
                             >
                                 <HiMiniPaperClip size={18} className="sm:text-[20px]" />
                             </button>
-                            
-                            {/* Send Icon Button */}
-                            <button 
-                                type="submit" 
-                                className={`bg-gray-700 rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center transition-colors ${
-                                    !inputMessage.trim() 
-                                    ? 'opacity-50 cursor-not-allowed' 
-                                    : 'hover:bg-gray-600'
+
+                            <button
+                                type="submit"
+                                className={`rounded-full w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center transition-all duration-200 ${
+                                    !inputMessage.trim() || isLoading
+                                    ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
                                 }`}
-                                disabled={!inputMessage.trim()}
+                                disabled={!inputMessage.trim() || isLoading}
                                 aria-label="Send message"
                             >
-                                <IoSendSharp size={16} className="sm:text-[18px]" />
+                                {isLoading ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                                ) : (
+                                    <IoSendSharp size={16} className="sm:text-[18px] translate-x-[1px]" />
+                                )}
                             </button>
                         </div>
                     </div>

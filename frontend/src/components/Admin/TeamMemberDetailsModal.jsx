@@ -7,12 +7,15 @@ import {
     IoCalendarOutline,
     IoTimeOutline,
     IoShieldCheckmarkOutline,
-    IoAppsOutline
+    IoAppsOutline,
+    IoAdd,
+    IoTrashOutline
 } from 'react-icons/io5';
-import { FiBox, FiMessageSquare, FiActivity} from 'react-icons/fi';
+import { FiBox, FiMessageSquare, FiActivity, FiTrash2, FiEdit, FiPlus } from 'react-icons/fi';
 import { axiosInstance } from '../../api/axiosInstance';
 import { toast } from 'react-toastify';
 import AssignGptsModal from './AssignGptsModal';
+import { useTheme } from '../../context/ThemeContext';
 
 const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
     const [activeTab, setActiveTab] = useState('profile');
@@ -26,6 +29,7 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
     });
     const [noteText, setNoteText] = useState('');
     const [showAssignGptsModal, setShowAssignGptsModal] = useState(false);
+    const { isDarkMode } = useTheme();
 
     // Fetch assigned GPTs when the modal opens or tab changes
     useEffect(() => {
@@ -168,6 +172,10 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
         setShowAssignGptsModal(true);
     };
 
+    const handleGptAssignmentChange = () => {
+        fetchAssignedGpts();
+    };
+
     if (!isOpen || !member) return null;
 
     // Format date for display
@@ -197,63 +205,71 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
         return formatDate(dateString);
     };
 
-    // Tab content components
+    // Tab content components with theme styles
     const renderProfileTab = () => (
-        <div className="space-y-6 py-4">
+        <div className="space-y-6 py-6 px-1">
             {/* Profile Header */}
             <div className="flex items-center space-x-4">
-                <div className="h-16 w-16 bg-gray-600 rounded-full flex items-center justify-center text-white text-xl">
+                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-medium flex-shrink-0">
                     {member.name.charAt(0)}
                 </div>
                 <div>
-                    <h2 className="text-xl font-semibold text-white">{member.name}</h2>
-                    <p className="text-gray-400">{member.position || 'No position set'}</p>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{member.name}</h2>
+                    <p className="text-gray-500 dark:text-gray-400">{member.position || 'No position set'}</p>
                 </div>
             </div>
 
             {/* Member Info Sections */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                    <h3 className="text-sm font-medium text-gray-300 mb-3 flex items-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600/50">
+                    <h3 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-3 flex items-center">
                         <IoPersonCircleOutline className="mr-2" size={18} />
                         Personal Information
                     </h3>
                     <div className="space-y-3">
                         <div>
-                            <p className="text-xs text-gray-400">Email</p>
-                            <p className="text-sm text-white">{member.email}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
+                            <p className="text-sm text-gray-800 dark:text-white truncate" title={member.email}>{member.email}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-gray-400">Department</p>
-                            <p className="text-sm text-white">{member.department}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Department</p>
+                            <p className="text-sm text-gray-800 dark:text-white">{member.department}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-gray-400">Position</p>
-                            <p className="text-sm text-white">{member.position || 'Not set'}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Position</p>
+                            <p className="text-sm text-gray-800 dark:text-white">{member.position || 'Not set'}</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                    <h3 className="text-sm font-medium text-gray-300 mb-3 flex items-center">
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600/50">
+                    <h3 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-3 flex items-center">
                         <IoShieldCheckmarkOutline className="mr-2" size={18} />
                         Account Status
                     </h3>
                     <div className="space-y-3">
                         <div>
-                            <p className="text-xs text-gray-400">Role</p>
-                            <p className="text-sm text-white">{member.role}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Role</p>
+                            <p className="text-sm text-gray-800 dark:text-white">{member.role}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-gray-400">Status</p>
-                            <div className="flex items-center">
-                                <span className={`inline-block w-2 h-2 rounded-full mr-2 ${member.status === 'Active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                                <span className="text-sm text-white">{member.status}</span>
-                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</p>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                member.status === 'Active'
+                                    ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                                    : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300'
+                            }`}>
+                                <IoBriefcaseOutline className={`mr-1 ${member.status === 'Active' ? 'text-green-500' : 'text-red-500'}`} size={12} />
+                                {member.status}
+                            </span>
                         </div>
                         <div>
-                            <p className="text-xs text-gray-400">Joined</p>
-                            <p className="text-sm text-white">{member.joined}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Joined Date</p>
+                            <p className="text-sm text-gray-800 dark:text-white">{formatDate(member.joined)}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Last Active</p>
+                            <p className="text-sm text-gray-800 dark:text-white">{formatRelativeTime(member.lastActive)}</p>
                         </div>
                     </div>
                 </div>
@@ -293,7 +309,7 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
                         className="bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md px-3 py-1.5 flex items-center"
                         onClick={handleAssignGpts}
                     >
-                        <FiBox className="mr-1.5" size={14} />
+                        <FiPlus className="mr-1.5" size={14} />
                         Assign GPTs
                     </button>
                 </div>
@@ -311,7 +327,7 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
                                         {gpt.imageUrl ? (
                                             <img src={gpt.imageUrl} alt={gpt.name} className="w-full h-full object-cover" />
                                         ) : (
-                                            <span className="text-lg text-white">{gpt.name.charAt(0)}</span>
+                                            <span className={`text-lg text-white ${isDarkMode ? 'text-white' : 'text-gray-600'}`}>{gpt.name.charAt(0)}</span>
                                         )}
                                     </div>
                                     <div>
@@ -328,7 +344,7 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
                                         className="text-red-400 hover:text-red-300 p-1.5 hover:bg-gray-600 rounded-full transition-colors"
                                         title="Remove GPT"
                                     >
-                                        <IoClose size={18} />
+                                        <FiTrash2 size={18} />
                                     </button>
                                 </div>
                             </div>
@@ -442,7 +458,7 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
                                     className="text-gray-500 hover:text-gray-400"
                                     onClick={() => handleRemoveNote(note.id)}
                                 >
-                                    <IoClose size={18} />
+                                    <IoTrashOutline size={18} />
                                 </button>
                             </div>
                         </div>
@@ -458,88 +474,50 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
     );
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/70" onClick={onClose}></div>
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'} transition-opacity duration-300`}>
+            <div className="absolute inset-0 bg-black/60 dark:bg-black/80" onClick={onClose}></div>
             
-            <div className="relative bg-gray-800 w-full max-w-4xl max-h-[90vh] rounded-xl shadow-xl border border-gray-700 overflow-hidden flex flex-col">
-                {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-700 flex justify-between items-center bg-gray-900">
-                    <h3 className="text-lg font-semibold text-white">
-                        Team Member Details
+            <div className={`relative bg-white dark:bg-gray-800 w-full max-w-3xl max-h-[90vh] rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col transform ${isOpen ? 'scale-100' : 'scale-95'} transition-transform duration-300`}>
+                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900 flex-shrink-0">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate pr-4">
+                        Member Details: {member?.name}
                     </h3>
                     <button 
                         onClick={onClose}
-                        className="text-gray-400 hover:text-white transition-colors rounded-full p-1 hover:bg-gray-700"
+                        className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-white transition-colors rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700 flex-shrink-0"
                     >
-                        <IoClose size={20} />
+                        <IoClose size={22} />
                     </button>
                 </div>
 
-                {/* Tabs Navigation */}
-                <div className="flex px-6 pt-4 border-b border-gray-700">
-                    <button
-                        className={`pb-3 px-4 text-sm font-medium border-b-2 ${
-                            activeTab === 'profile' 
-                                ? 'border-blue-500 text-blue-400' 
-                                : 'border-transparent text-gray-400 hover:text-gray-300'
-                        } transition-colors duration-150`}
-                        onClick={() => setActiveTab('profile')}
-                    >
-                        Profile
-                    </button>
-                    <button
-                        className={`pb-3 px-4 text-sm font-medium border-b-2 ${
-                            activeTab === 'gpts' 
-                                ? 'border-blue-500 text-blue-400' 
-                                : 'border-transparent text-gray-400 hover:text-gray-300'
-                        } transition-colors duration-150`}
-                        onClick={() => setActiveTab('gpts')}
-                    >
-                        Assigned GPTs
-                    </button>
-                    <button
-                        className={`pb-3 px-4 text-sm font-medium border-b-2 ${
-                            activeTab === 'activity' 
-                                ? 'border-blue-500 text-blue-400' 
-                                : 'border-transparent text-gray-400 hover:text-gray-300'
-                        } transition-colors duration-150`}
-                        onClick={() => setActiveTab('activity')}
-                    >
-                        Activity
-                    </button>
-                    <button
-                        className={`pb-3 px-4 text-sm font-medium border-b-2 ${
-                            activeTab === 'notes' 
-                                ? 'border-blue-500 text-blue-400' 
-                                : 'border-transparent text-gray-400 hover:text-gray-300'
-                        } transition-colors duration-150`}
-                        onClick={() => setActiveTab('notes')}
-                    >
-                        Notes
-                    </button>
+                <div className="px-6 pt-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 bg-white dark:bg-gray-800">
+                    <div className="flex gap-1 -mb-px">
+                        {[
+                            { id: 'profile', label: 'Profile', icon: IoPersonCircleOutline },
+                            { id: 'gpts', label: 'Assigned GPTs', icon: IoAppsOutline },
+                            { id: 'activity', label: 'Activity', icon: FiActivity },
+                            { id: 'notes', label: 'Notes', icon: IoBriefcaseOutline },
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`px-4 py-2.5 border-b-2 text-sm font-medium transition-colors duration-200 flex items-center gap-2 whitespace-nowrap ${
+                                    activeTab === tab.id
+                                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white hover:border-gray-300 dark:hover:border-gray-600'
+                                }`}
+                            >
+                                <tab.icon size={16} /> {tab.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
                 
-                {/* Tab Content - Scrollable */}
-                <div className="flex-1 overflow-y-auto px-6 scrollbar-hide">
+                <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-800/50 custom-scrollbar-dark dark:custom-scrollbar">
                     {activeTab === 'profile' && renderProfileTab()}
                     {activeTab === 'gpts' && renderAssignedGptsTab()}
                     {activeTab === 'activity' && renderActivityTab()}
                     {activeTab === 'notes' && renderNotesTab()}
-                </div>
-                
-                {/* Footer */}
-                <div className="px-6 py-4 border-t border-gray-700 flex justify-end bg-gray-900">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 bg-gray-700 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors mr-3"
-                    >
-                        Close
-                    </button>
-                    <button
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                    >
-                        Edit Member
-                    </button>
                 </div>
             </div>
 
@@ -572,6 +550,7 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
                         }
                     }}
                     teamMember={member}
+                    onAssignmentChange={handleGptAssignmentChange}
                 />
             )}
         </div>

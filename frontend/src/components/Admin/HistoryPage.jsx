@@ -10,6 +10,7 @@ import {
   IoArrowBack
 } from 'react-icons/io5';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTheme } from '../../context/ThemeContext'; // Import useTheme
 
 // Import team member data
 import { teamMembers } from './teamData';
@@ -19,6 +20,7 @@ import { axiosInstance } from '../../api/axiosInstance';
 const HistoryPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isDarkMode } = useTheme(); // Get theme state
   
   // Initialize view type from URL parameter or default to 'personal'
   const queryParams = new URLSearchParams(location.search);
@@ -274,27 +276,27 @@ const HistoryPage = () => {
   `;
 
   return (
-    <div className="flex flex-col h-full bg-black text-gray-100 overflow-hidden">
+    <div className={`flex flex-col h-full ${isDarkMode ? 'dark' : ''} bg-white dark:bg-black text-gray-900 dark:text-gray-100 overflow-hidden`}>
       {/* Add hidden scrollbar styles */}
       <style>{scrollbarHideStyles}</style>
       
       {/* Header section */}
-      <div className="px-6 pt-6 pb-5 flex-shrink-0 border-b border-gray-800">
-        <h1 className="text-2xl font-semibold text-white">Activity History</h1>
-        <p className="text-sm text-gray-400 mt-1">Track actions and changes across your workspace</p>
+      <div className="px-6 pt-6 pb-5 flex-shrink-0 border-b border-gray-300 dark:border-gray-800">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Activity History</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Track actions and changes across your workspace</p>
       </div>
       
       {/* Controls section */}
-      <div className="px-6 py-4 flex-shrink-0 border-b border-gray-800">
+      <div className="px-6 py-4 flex-shrink-0 border-b border-gray-300 dark:border-gray-800">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
           {/* View switcher */}
-          <div className="inline-flex items-center p-1 rounded-lg bg-gray-900 border border-gray-700 self-center sm:self-start">
+          <div className="inline-flex items-center p-1 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 self-center sm:self-start">
             <button
               onClick={() => setViewType('personal')}
               className={`flex items-center px-3 py-1.5 rounded text-sm transition-all ${
-                viewType === 'personal' 
-                  ? 'bg-gray-700 text-white font-medium' 
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                viewType === 'personal'
+                  ? 'bg-gray-300 dark:bg-gray-700 text-gray-900 dark:text-white font-medium'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800'
               }`}
             >
               <IoPersonOutline size={16} className="mr-1.5" />
@@ -303,9 +305,9 @@ const HistoryPage = () => {
             <button
               onClick={() => setViewType('team')}
               className={`flex items-center px-3 py-1.5 rounded text-sm transition-all ${
-                viewType === 'team' 
-                  ? 'bg-gray-700 text-white font-medium' 
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                viewType === 'team'
+                  ? 'bg-gray-300 dark:bg-gray-700 text-gray-900 dark:text-white font-medium'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800'
               }`}
             >
               <IoPeopleOutline size={16} className="mr-1.5" />
@@ -317,11 +319,11 @@ const HistoryPage = () => {
           <div className="flex flex-1 sm:justify-end max-w-lg gap-2 self-center w-full sm:w-auto">
             <div className="relative flex-1 sm:max-w-xs">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <IoSearchOutline className="text-gray-500" size={18} />
+                <IoSearchOutline className="text-gray-400 dark:text-gray-500" size={18} />
               </div>
               <input
                 type="text"
-                className="w-full pl-10 pr-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-gray-100 text-sm placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 focus:border-gray-500"
+                className="w-full pl-10 pr-3 py-2 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-gray-100 text-sm placeholder-gray-500 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 focus:border-gray-500"
                 placeholder="Search activities..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -331,7 +333,7 @@ const HistoryPage = () => {
             <div className="relative" ref={filterDropdownRef}>
               <button
                 onClick={() => setFilterOpen(!filterOpen)}
-                className="flex items-center px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:border-gray-600 transition-colors"
+                className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
               >
                 <IoFilterOutline size={16} className="mr-1.5" />
                 <span>Filter</span>
@@ -340,26 +342,26 @@ const HistoryPage = () => {
               
               {/* Filter Dropdown */}
               {filterOpen && (
-                <div className="absolute right-0 mt-2 w-60 rounded-lg bg-gray-900 border border-gray-700 shadow-2xl z-20 p-4">
+                <div className="absolute right-0 mt-2 w-60 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-2xl z-20 p-4">
                   <div className="mb-4">
-                    <h3 className="text-gray-300 font-medium text-sm mb-2">Action Types</h3>
+                    <h3 className="text-gray-700 dark:text-gray-300 font-medium text-sm mb-2">Action Types</h3>
                     <div className="space-y-1.5">
                       {Object.keys(filterOptions.actionTypes).map((type) => (
                         <label key={type} className="flex items-center text-sm">
                           <input
                             type="checkbox"
-                            className="form-checkbox h-4 w-4 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900"
+                            className="form-checkbox h-4 w-4 rounded bg-gray-200 dark:bg-gray-700 border-gray-400 dark:border-gray-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-900"
                             checked={filterOptions.actionTypes[type]}
                             onChange={(e) => toggleFilterOption(type, e.target.checked)}
                           />
-                          <span className="ml-2 text-gray-300 capitalize">{type}</span>
+                          <span className="ml-2 text-gray-700 dark:text-gray-300 capitalize">{type}</span>
                         </label>
                       ))}
                     </div>
                   </div>
                   
                   <div>
-                    <h3 className="text-gray-300 font-medium text-sm mb-2">Time Period</h3>
+                    <h3 className="text-gray-700 dark:text-gray-300 font-medium text-sm mb-2">Time Period</h3>
                     <div className="grid grid-cols-2 gap-2">
                       {['today', 'week', 'month', 'all'].map((range) => (
                         <button
@@ -367,7 +369,7 @@ const HistoryPage = () => {
                           className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
                             filterOptions.dateRange === range
                               ? 'bg-blue-600 text-white'
-                              : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
+                              : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200'
                           }`}
                           onClick={() => setDateRangeFilter(range)}
                         >
@@ -390,11 +392,11 @@ const HistoryPage = () => {
             <div className="rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500 animate-spin"></div>
           </div>
         ) : filteredActivities.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 px-4">
-            <div className="border-2 border-gray-800 rounded-full p-4 mb-4">
-              <IoTimeOutline size={32} className="text-gray-600" />
+          <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-500 px-4">
+            <div className="border-2 border-gray-300 dark:border-gray-800 rounded-full p-4 mb-4">
+              <IoTimeOutline size={32} className="text-gray-400 dark:text-gray-600" />
             </div>
-            <h3 className="text-lg font-medium text-gray-300 mb-1">No Activities Found</h3>
+            <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-1">No Activities Found</h3>
             <p className="text-sm max-w-sm">
               {searchQuery || filterOptions.dateRange !== 'all' || !Object.values(filterOptions.actionTypes).every(v => v)
                 ? "No activities match your current filters. Try adjusting your search or filter criteria."
@@ -404,15 +406,15 @@ const HistoryPage = () => {
           </div>
         ) : (
           <div className="w-full max-w-4xl">
-            <div className="space-y-3 relative border-l border-gray-800 ml-4">
+            <div className="space-y-3 relative border-l border-gray-300 dark:border-gray-800 ml-4">
               {filteredActivities.map((activity) => (
                 <div 
                   key={activity.id} 
-                  className="relative bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-lg p-4 ml-4 transition-colors"
+                  className="relative bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-750 border border-gray-300 dark:border-gray-700 rounded-lg p-4 ml-4 transition-colors"
                 >
                   {/* Timeline marker dot */}
-                  <div className="absolute -left-[10px] top-[50%] transform -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-gray-700 border-2 border-gray-600">
-                    <IoEllipse size={6} className="text-gray-400"/> 
+                  <div className="absolute -left-[10px] top-[50%] transform -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600">
+                    <IoEllipse size={6} className="text-gray-500 dark:text-gray-400"/> 
                   </div>
                   
                   {/* Activity content */}
@@ -421,7 +423,7 @@ const HistoryPage = () => {
                       {viewType === 'team' && (
                         <div className="mb-1.5 flex items-center">
                           <span 
-                            className="font-semibold text-white cursor-pointer hover:underline"
+                            className="font-semibold text-gray-900 dark:text-white cursor-pointer hover:underline"
                             onClick={() => navigate(`/admin/history/user/${activity.user.id}?view=${viewType}`)}
                           >
                             {activity.user.name}
@@ -430,14 +432,14 @@ const HistoryPage = () => {
                       )}
                       
                       <p className="text-sm">
-                        <span className="text-gray-300">{activity.action}</span>
+                        <span className="text-gray-700 dark:text-gray-300">{activity.action}</span>
                         {activity.details && (
-                          <> <span className="font-medium text-white">{activity.details}</span></>
+                          <> <span className="font-medium text-gray-900 dark:text-white">{activity.details}</span></>
                         )}
                       </p>
                     </div>
                     
-                    <div className="text-xs text-gray-500 whitespace-nowrap">
+                    <div className="text-xs text-gray-500 dark:text-gray-500 whitespace-nowrap">
                       {formatTimestamp(activity.timestamp)}
                     </div>
                   </div>
