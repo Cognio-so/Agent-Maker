@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const Invitation = require('../models/Invitation');
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
+const UserGptAssignment = require('../models/UserGptAssignment');
 
 const Signup = async (req, res) => {
     const { name, email, password } = req.body;
@@ -388,4 +389,81 @@ const setInactive = async (req, res) => {
     }
 };
 
-module.exports = { Signup, Login, Logout, googleAuth, googleAuthCallback, refreshTokenController, getCurrentUser, getAllUsers, inviteTeamMember, getPendingInvitesCount, setInactive, removeTeamMember };
+// Get users with GPT counts in one call
+const getUsersWithGptCounts = async (req, res) => {
+    try {
+        // Only admin should be able to get all users
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Not authorized to access this resource' });
+        }
+        
+        // Get pagination parameters
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+        
+        // Get total count first
+        const total = await User.countDocuments({});
+        
+        // Get users with pagination
+        const users = await User.find({})
+            .select('-password')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+            
+        // Get GPT counts in one query
+        const assignments = await UserGptAssignment.aggregate([
+            {
+                $group: {
+                    _id: '$userId',
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+        
+        // Create a map of user IDs to GPT counts
+        const gptCountMap = {};
+        assignments.forEach(assignment => {
+            gptCountMap[assignment._id.toString()] = assignment.count;
+        });
+        
+        // Add GPT counts to user objects
+        const usersWithCounts = users.map(user => {
+            const userObj = user.toObject();
+            userObj.gptCount = gptCountMap[user._id.toString()] || 0;
+            return userObj;
+        });
+        
+        res.status(200).json({
+            success: true,
+            users: usersWithCounts,
+            total,
+            page,
+            limit
+        });
+    } catch (error) {
+        console.error('Error fetching users with GPT counts:', error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Get a single user's GPT count
+const getUserGptCount = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        
+        // Count GPT assignments for this user
+        const count = await UserGptAssignment.countDocuments({ userId });
+        
+        res.status(200).json({
+            success: true,
+            count
+        });
+    } catch (error) {
+        console.error('Error fetching user GPT count:', error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { Signup, Login, Logout, googleAuth, googleAuthCallback, refreshTokenController, getCurrentUser, getAllUsers, inviteTeamMember, getPendingInvitesCount, setInactive, removeTeamMember, getUsersWithGptCounts, getUserGptCount };

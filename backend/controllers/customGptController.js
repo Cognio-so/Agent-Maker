@@ -655,6 +655,68 @@ const getAssignedGptById = async (req, res) => {
   }
 };
 
+// New controller function to update the folder
+const updateGptFolder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { folder } = req.body; // folder can be a string or null/undefined
+
+    // Validate folder name slightly (optional, prevent overly long names etc.)
+    if (folder && typeof folder === 'string' && folder.length > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Folder name is too long (max 100 characters).'
+      });
+    }
+
+    const customGpt = await CustomGpt.findById(id);
+
+    if (!customGpt) {
+      return res.status(404).json({
+        success: false,
+        message: 'Custom GPT not found'
+      });
+    }
+
+    // Check if the user owns this GPT or is an admin (adjust authorization as needed)
+    // Assuming only the creator can modify it for now
+    if (customGpt.createdBy.toString() !== req.user._id.toString()) {
+      // Maybe allow admins too?
+      // if (customGpt.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to modify this custom GPT'
+      });
+    }
+
+    // Update the folder - set to null if folder is null/empty string, otherwise use the string
+    customGpt.folder = folder || null; 
+    
+    await customGpt.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'GPT folder updated successfully',
+      customGpt: { // Send back minimal updated info if needed
+        _id: customGpt._id,
+        folder: customGpt.folder
+      } 
+    });
+
+  } catch (error) {
+    console.error('Error updating GPT folder:', error);
+    // Handle potential validation errors from Mongoose if you add stricter schema rules
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update GPT folder',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   createCustomGpt,
   getUserCustomGpts,
@@ -668,5 +730,6 @@ module.exports = {
   assignGptToUser,
   unassignGptFromUser,
   getUserGptCount,
-  getAssignedGptById
+  getAssignedGptById,
+  updateGptFolder
 }; 

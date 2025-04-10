@@ -13,7 +13,8 @@ const {
     assignGptToUser,
     unassignGptFromUser,
     getUserGptCount,
-    getAssignedGptById
+    getAssignedGptById,
+    updateGptFolder
 } = require('../controllers/customGptController');
 const { protectRoute } = require('../middleware/authMiddleware');
 
@@ -40,6 +41,7 @@ router.get('/:id', getCustomGptById);
 router.put('/:id', uploadMiddleware, updateCustomGpt);
 router.delete('/:id', deleteCustomGpt);
 router.delete('/:id/knowledge/:fileIndex', deleteKnowledgeFile);
+router.patch('/:id/folder', updateGptFolder);
 
 // Get assigned GPT by ID for the current user
 router.get('/user/assigned/:id', protectRoute, getAssignedGptById);

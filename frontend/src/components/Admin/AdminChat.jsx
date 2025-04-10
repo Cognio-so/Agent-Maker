@@ -133,7 +133,7 @@ const AdminChat = () => {
 
     return (
         <div className='flex flex-col h-screen bg-white dark:bg-black text-black dark:text-white overflow-hidden'>
-            <div className="flex-shrink-0 bg-white dark:bg-black px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-800">
+            <div className="flex-shrink-0 bg-white dark:bg-black px-4 py-3 flex items-center justify-between">
                 <div className="w-10 h-10">
                     {gptId && (
                         <button 
@@ -188,7 +188,7 @@ const AdminChat = () => {
                 </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col bg-gray-50 dark:bg-gray-900/50">
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col bg-white dark:bg-black">
                 <div className="w-full max-w-3xl mx-auto flex-1 flex flex-col space-y-4 pb-4">
                     {isFetchingGpt ? (
                         <div className="flex-1 flex items-center justify-center">
@@ -288,11 +288,10 @@ const AdminChat = () => {
                 </div>
             </div>
             
-            <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex-shrink-0 w-[95%] max-w-3xl  mx-auto">
                 <AdminMessageInput
                     onSubmit={handleChatSubmit}
                     isLoading={isLoading}
-                    currentGptName={gptData?.name}
                 />
             </div>
             

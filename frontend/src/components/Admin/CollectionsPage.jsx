@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import axios from 'axios';
-import { FiEdit, FiTrash2, FiSearch, FiChevronDown, FiChevronUp, FiPlus, FiInfo } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiSearch, FiChevronDown, FiChevronUp, FiPlus, FiInfo, FiFolder, FiFolderPlus } from 'react-icons/fi';
 import { SiOpenai, SiGooglegemini } from 'react-icons/si';
 import { FaRobot } from 'react-icons/fa6';
 import { BiLogoMeta } from 'react-icons/bi';
@@ -9,8 +9,9 @@ import { useNavigate } from 'react-router-dom';
 import { axiosInstance } from '../../api/axiosInstance';
 import { useTheme } from '../../context/ThemeContext';
 import { toast } from 'react-toastify';
+import MoveToFolderModal from './MoveToFolderModal';
 
-// Model icons mapping - moved outside component to prevent recreation
+// Model icons mapping
 const modelIcons = {
     'gpt-4': <RiOpenaiFill className="text-green-500" size={18} />,
     'gpt-3.5': <SiOpenai className="text-green-400" size={16} />,
@@ -19,8 +20,8 @@ const modelIcons = {
     'llama': <BiLogoMeta className="text-blue-500" size={18} />
 };
 
-// Memoized GPT card component with theme styles
-const GptCard = memo(({ gpt, onDelete, onEdit, formatDate, onNavigate, isDarkMode }) => (
+// Memoized GPT card component
+const GptCard = memo(({ gpt, onDelete, onEdit, formatDate, onNavigate, isDarkMode, onMoveToFolder }) => (
     <div 
         key={gpt._id} 
         className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-blue-400/50 dark:hover:border-gray-600 transition-all shadow-md hover:shadow-lg flex flex-col cursor-pointer group"
@@ -42,20 +43,21 @@ const GptCard = memo(({ gpt, onDelete, onEdit, formatDate, onNavigate, isDarkMod
             
             <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                 <button 
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onEdit(gpt._id);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); onMoveToFolder(gpt); }}
+                    className="p-1.5 sm:p-2 bg-white/80 dark:bg-gray-900/70 text-gray-700 dark:text-gray-200 rounded-full hover:bg-green-500 hover:text-white dark:hover:bg-green-700/80 transition-colors shadow"
+                    title="Move to Folder"
+                >
+                    <FiFolderPlus size={14} />
+                </button>
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onEdit(gpt._id); }}
                     className="p-1.5 sm:p-2 bg-white/80 dark:bg-gray-900/70 text-gray-700 dark:text-gray-200 rounded-full hover:bg-blue-500 hover:text-white dark:hover:bg-blue-700/80 transition-colors shadow"
                     title="Edit GPT"
                 >
                     <FiEdit size={14} />
                 </button>
                 <button 
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(gpt._id);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); onDelete(gpt._id); }}
                     className="p-1.5 sm:p-2 bg-white/80 dark:bg-gray-900/70 text-gray-700 dark:text-gray-200 rounded-full hover:bg-red-500 hover:text-white dark:hover:bg-red-700/80 transition-colors shadow"
                     title="Delete GPT"
                 >
@@ -73,22 +75,27 @@ const GptCard = memo(({ gpt, onDelete, onEdit, formatDate, onNavigate, isDarkMod
                 </div>
             </div>
             
-            <p className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm h-10 sm:h-12 line-clamp-2 sm:line-clamp-3 mb-3">
-                {gpt.description}
-            </p>
-            
+            <p className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm h-10 sm:h-12 line-clamp-2 sm:line-clamp-3 mb-3">{gpt.description}</p>
             <div className="mt-auto pt-2 border-t border-gray-100 dark:border-gray-700 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 flex justify-between items-center">
                 <span>Created: {formatDate(gpt.createdAt)}</span>
                 {gpt.knowledgeFiles?.length > 0 && (
                     <span className="whitespace-nowrap">{gpt.knowledgeFiles.length} {gpt.knowledgeFiles.length === 1 ? 'file' : 'files'}</span>
                 )}
             </div>
+            {gpt.folder && (
+                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                    <FiFolder size={12} />
+                    <span>{gpt.folder}</span>
+                </div>
+            )}
         </div>
     </div>
 ));
 
 const CollectionsPage = () => {
     const [customGpts, setCustomGpts] = useState([]);
+    const [folders, setFolders] = useState(['All', 'Uncategorized']); // Default folders
+    const [selectedFolder, setSelectedFolder] = useState('All');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -97,36 +104,41 @@ const CollectionsPage = () => {
     const sortDropdownRef = useRef(null);
     const { isDarkMode } = useTheme();
     const navigate = useNavigate();
+    const [showMoveModal, setShowMoveModal] = useState(false);
+    const [gptToMove, setGptToMove] = useState(null);
 
-    // Memoized fetchCustomGpts function with error toast
     const fetchCustomGpts = useCallback(async () => {
         try {
             setLoading(true);
-            setError(null); // Clear previous errors
+            setError(null);
             const response = await axiosInstance.get(`/api/custom-gpts`, { withCredentials: true });
 
-            if (response.data.success && response.data.customGpts) { // Check customGpts existence
+            if (response.data.success && response.data.customGpts) {
                 setCustomGpts(response.data.customGpts);
+                // Extract unique folders from GPTs
+                const uniqueFolders = [...new Set(response.data.customGpts
+                    .filter(gpt => gpt.folder)
+                    .map(gpt => gpt.folder))];
+                setFolders(prev => [...new Set(['All', 'Uncategorized', ...uniqueFolders])]);
             } else {
-                const message = response.data.message || "Failed to fetch custom GPTs: Invalid response";
+                const message = response.data.message || "Failed to fetch custom GPTs";
                 setError(message);
                 toast.error(message);
             }
         } catch (err) {
             console.error("Error fetching custom GPTs:", err);
-             const message = err.response?.data?.message || "Error connecting to server";
-             setError(message);
+            const message = err.response?.data?.message || "Error connecting to server";
+            setError(message);
             toast.error(message);
         } finally {
             setLoading(false);
         }
-    }, []); // Removed toast dependency, it's stable
+    }, []);
 
     useEffect(() => {
         fetchCustomGpts();
     }, [fetchCustomGpts]);
 
-    // Memoized click outside handler
     const handleClickOutside = useCallback((event) => {
         if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
             setShowSortOptions(false);
@@ -135,43 +147,28 @@ const CollectionsPage = () => {
 
     useEffect(() => {
         document.addEventListener("mousedown", handleClickOutside);
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        };
+        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [handleClickOutside]);
 
-    // Memoized event handlers with toast notifications
     const handleDelete = useCallback(async (id) => {
-        if (window.confirm("Are you sure you want to delete this GPT? This action cannot be undone.")) {
-            // Optimistic UI update (optional but good UX)
-            // const originalGpts = [...customGpts];
-            // setCustomGpts(prev => prev.filter(gpt => gpt._id !== id));
-            setLoading(true); // Show loading state during delete
-
+        if (window.confirm("Are you sure you want to delete this GPT?")) {
+            setLoading(true);
             try {
                 const response = await axiosInstance.delete(`/api/custom-gpts/${id}`, { withCredentials: true });
-
                 if (response.data.success) {
-                     toast.success(`GPT deleted successfully.`);
-                    // Refetch or filter state (refetch is simpler if optimistic UI wasn't done)
-                     fetchCustomGpts(); // Refetch the list
-                 } else {
-                     const message = response.data.message || "Failed to delete GPT";
-                     toast.error(message);
-                    // Revert optimistic update if done
-                    // setCustomGpts(originalGpts);
-                 }
+                    toast.success(`GPT deleted successfully.`);
+                    fetchCustomGpts();
+                } else {
+                    toast.error(response.data.message || "Failed to delete GPT");
+                }
             } catch (err) {
                 console.error("Error deleting custom GPT:", err);
-                 const message = err.response?.data?.message || "Error deleting GPT";
-                 toast.error(message);
-                 // Revert optimistic update if done
-                 // setCustomGpts(originalGpts);
+                toast.error(err.response?.data?.message || "Error deleting GPT");
             } finally {
-                 setLoading(false);
-             }
+                setLoading(false);
+            }
         }
-    }, [fetchCustomGpts]); // Add fetchCustomGpts dependency
+    }, [fetchCustomGpts]);
 
     const handleEdit = useCallback((id) => {
         navigate(`/admin/edit-gpt/${id}`);
@@ -186,8 +183,7 @@ const CollectionsPage = () => {
     }, [navigate]);
 
     const formatDate = useCallback((dateString) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
+        return new Date(dateString).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
             day: 'numeric'
@@ -207,12 +203,43 @@ const CollectionsPage = () => {
         setShowSortOptions(false);
     }, []);
 
-    // Memoized filtered and sorted GPTs
+    // Function to open the move modal
+    const handleMoveToFolder = useCallback((gpt) => {
+        setGptToMove(gpt);
+        setShowMoveModal(true);
+    }, []);
+
+    // Function called when a GPT is successfully moved
+    const handleGptMoved = useCallback((movedGpt, newFolderName) => {
+        // Update the local state
+        setCustomGpts(prevGpts => 
+            prevGpts.map(gpt => 
+                gpt._id === movedGpt._id ? { ...gpt, folder: newFolderName || null } : gpt
+            )
+        );
+        // Add the new folder to the list if it's not already there
+        if (newFolderName && !folders.includes(newFolderName)) {
+            setFolders(prevFolders => [...prevFolders, newFolderName]);
+        }
+        // Optionally, switch view to the new folder? Or stay in 'All'
+        // setSelectedFolder(newFolderName || 'Uncategorized'); 
+        setShowMoveModal(false);
+        setGptToMove(null);
+        toast.success(`GPT "${movedGpt.name}" moved successfully.`);
+    }, [folders]); // Include folders in dependency array
+
+    // Memoized filtered and sorted GPTs with folder support
     const filteredGpts = useMemo(() => {
         return customGpts
             .filter(gpt => {
-                // Handle potential undefined fields gracefully
-                 if (!gpt || !gpt.name || !gpt.description || !gpt.model) return false;
+                if (!gpt || !gpt.name || !gpt.description || !gpt.model) return false;
+                
+                // Folder filtering
+                if (selectedFolder === 'All') return true;
+                if (selectedFolder === 'Uncategorized') return !gpt.folder;
+                return gpt.folder === selectedFolder;
+            })
+            .filter(gpt => {
                 if (!searchTerm) return true;
                 const searchLower = searchTerm.toLowerCase();
                 return (
@@ -222,11 +249,10 @@ const CollectionsPage = () => {
                 );
             })
             .sort((a, b) => {
-                // Handle potential missing dates
-                 const dateA = a.createdAt ? new Date(a.createdAt) : 0;
-                 const dateB = b.createdAt ? new Date(b.createdAt) : 0;
-                 const nameA = a.name || '';
-                 const nameB = b.name || '';
+                const dateA = a.createdAt ? new Date(a.createdAt) : 0;
+                const dateB = b.createdAt ? new Date(b.createdAt) : 0;
+                const nameA = a.name || '';
+                const nameB = b.name || '';
 
                 switch (sortOption) {
                     case 'newest': return dateB - dateA;
@@ -235,22 +261,18 @@ const CollectionsPage = () => {
                     default: return dateB - dateA;
                 }
             });
-    }, [customGpts, searchTerm, sortOption]);
+    }, [customGpts, searchTerm, sortOption, selectedFolder]);
 
-    // Loading State
     if (loading && customGpts.length === 0) {
         return (
-             // Apply theme colors
             <div className="flex items-center justify-center h-full bg-white dark:bg-black text-gray-600 dark:text-gray-400">
                 <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
             </div>
         );
     }
 
-    // Error State
     if (error && customGpts.length === 0) {
         return (
-            // Apply theme colors
             <div className="flex flex-col items-center justify-center h-full bg-white dark:bg-black text-gray-600 dark:text-gray-400 p-6">
                 <FiInfo size={40} className="mb-4 text-red-500" />
                 <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">Loading Failed</h2>
@@ -266,28 +288,43 @@ const CollectionsPage = () => {
     }
 
     return (
-        // Apply theme colors to main container
         <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 text-black dark:text-white p-4 sm:p-6 overflow-hidden">
             {/* Header */}
             <div className="mb-4 md:mb-6 flex-shrink-0 text-center sm:text-left">
-                {/* Apply theme text color */}
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Collections</h1>
-                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your custom GPTs</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your custom GPTs</p>
             </div>
             
-            {/* Controls: Search, Sort, Create */}
+            {/* Controls: Folder, Search, Sort, Create */}
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 md:mb-6 gap-3 md:gap-4 flex-shrink-0">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
+                    {/* Folder Dropdown */}
+                    <div className="relative">
+                        <select
+                            value={selectedFolder}
+                            onChange={(e) => setSelectedFolder(e.target.value)}
+                            className="w-full sm:w-36 px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 appearance-none cursor-pointer"
+                            aria-label="Select Folder"
+                        >
+                            {folders.map(folder => (
+                                <option key={folder} value={folder}>
+                                    {folder}
+                                </option>
+                            ))}
+                        </select>
+                        <FiFolder className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                    </div>
+
                     {/* Search Input */}
                     <div className="relative flex-grow sm:flex-grow-0">
-                         {/* Apply theme colors */}
-                         <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
                             type="text"
                             placeholder="Search GPTs..."
                             value={searchTerm}
                             onChange={handleSearchChange}
                             className="w-full sm:w-52 md:w-64 pl-10 pr-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                            aria-label="Search GPTs"
                         />
                     </div>
                     
@@ -295,21 +332,19 @@ const CollectionsPage = () => {
                     <div className="relative" ref={sortDropdownRef}>
                         <button
                             onClick={toggleSortOptions}
-                             // Apply theme colors
-                             className="flex items-center justify-between w-full sm:w-36 px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
+                            className="flex items-center justify-between w-full sm:w-36 px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
+                            aria-haspopup="true"
+                            aria-expanded={showSortOptions}
                         >
                             <span className="truncate">Sort: {sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}</span>
                             {showSortOptions ? <FiChevronUp size={16}/> : <FiChevronDown size={16}/>}
                         </button>
-                        {/* Sort Options Menu */}
                         {showSortOptions && (
-                            // Apply theme colors
                             <div className="absolute left-0 mt-2 w-36 bg-white dark:bg-gray-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 z-10 overflow-hidden">
                                 {['newest', 'oldest', 'alphabetical'].map((option) => (
                                     <button
                                         key={option}
                                         onClick={() => handleSortOptionSelect(option)}
-                                        // Apply theme colors
                                         className={`w-full text-left px-4 py-2 text-sm ${sortOption === option ? 'font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                                     >
                                         {option.charAt(0).toUpperCase() + option.slice(1)}
@@ -323,7 +358,6 @@ const CollectionsPage = () => {
                 {/* Create Button */}
                 <button
                     onClick={handleCreateNew}
-                    // Apply theme colors (consistent blue button)
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors flex-shrink-0 whitespace-nowrap"
                 >
                     <FiPlus size={18} /> Create New GPT
@@ -331,7 +365,6 @@ const CollectionsPage = () => {
             </div>
             
             {/* GPT Grid */}
-             {/* Apply theme scrollbar styling */}
             <div className="flex-1 overflow-y-auto pb-4 custom-scrollbar-dark dark:custom-scrollbar">
                 {filteredGpts.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -343,32 +376,44 @@ const CollectionsPage = () => {
                                 onEdit={handleEdit} 
                                 formatDate={formatDate}
                                 onNavigate={handleNavigate}
-                                isDarkMode={isDarkMode} // Pass theme state
+                                isDarkMode={isDarkMode}
+                                onMoveToFolder={handleMoveToFolder}
                             />
                         ))}
                     </div>
                 ) : (
-                     // Empty State
-                    // Apply theme colors
                     <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-400 pt-10">
                         <FaRobot size={48} className="mb-4 text-gray-400 dark:text-gray-500" />
                         <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">No GPTs Found</h3>
                         <p className="max-w-xs mt-1">
-                            {searchTerm ? `No GPTs match your search "${searchTerm}".` : "You haven't created any custom GPTs yet."}
+                            {searchTerm 
+                                ? `No GPTs match your search "${searchTerm}" in ${selectedFolder === 'All' ? 'any folder' : `the '${selectedFolder}' folder`}.`
+                                : `No GPTs found in ${selectedFolder === 'All' ? 'your collections' : `the '${selectedFolder}' folder`}.`}
                         </p>
-                         {!searchTerm && (
-                             <button
+                        {!searchTerm && selectedFolder === 'All' && (
+                            <button
                                 onClick={handleCreateNew}
                                 className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
                             >
                                 <FiPlus size={18} /> Create Your First GPT
                             </button>
-                         )}
+                        )}
                     </div>
                 )}
             </div>
+
+            {/* Move to Folder Modal */}
+            {showMoveModal && gptToMove && (
+                <MoveToFolderModal
+                    isOpen={showMoveModal}
+                    onClose={() => { setShowMoveModal(false); setGptToMove(null); }}
+                    gpt={gptToMove}
+                    existingFolders={folders.filter(f => f !== 'All' && f !== 'Uncategorized')}
+                    onSuccess={handleGptMoved}
+                />
+            )}
         </div>
     );
 };
 
-export default CollectionsPage; 
+export default CollectionsPage;

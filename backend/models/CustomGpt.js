@@ -46,6 +46,11 @@ const CustomGptSchema = new Schema({
         type: Boolean,
         default: false
     },
+    folder: {
+        type: String,
+        trim: true,
+        default: null
+    },
     createdAt: {
         type: Date,
         default: Date.now

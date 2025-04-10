@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
     IoClose, 
     IoPersonCircleOutline,
@@ -30,92 +30,91 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
     const [noteText, setNoteText] = useState('');
     const [showAssignGptsModal, setShowAssignGptsModal] = useState(false);
     const { isDarkMode } = useTheme();
+    
+    // IMPROVEMENT 1: Cache data between tab switches
+    const dataCache = useRef({
+        gpts: null,
+        activity: null,
+        notes: null
+    });
 
-    // Fetch assigned GPTs when the modal opens or tab changes
-    useEffect(() => {
-        if (!isOpen || !member || activeTab !== 'gpts') return;
+    // IMPROVEMENT 2: Combined data fetching function with caching
+    const fetchTabData = async (tabName) => {
+        // Skip if we already have cached data
+        if (dataCache.current[tabName]) {
+            if (tabName === 'gpts') setMemberGpts(dataCache.current.gpts);
+            if (tabName === 'activity') setUserActivity(dataCache.current.activity);
+            if (tabName === 'notes') setUserNotes(dataCache.current.notes);
+            return;
+        }
+
+        // Set loading state just for this tab
+        setLoading(prev => ({ ...prev, [tabName]: true }));
         
-        const fetchAssignedGpts = async () => {
-            setLoading(prev => ({ ...prev, gpts: true }));
-            try {
-                const response = await axiosInstance.get(`/api/custom-gpts/team/members/${member.id}/gpts`, {
-                    withCredentials: true
-                });
-                
-                if (response.data && response.data.gpts) {
-                    setMemberGpts(response.data.gpts);
-                }
-            } catch (error) {
-                console.error("Error fetching assigned GPTs:", error);
-                toast.error("Could not load assigned GPTs");
-            } finally {
-                setLoading(prev => ({ ...prev, gpts: false }));
+        try {
+            let response;
+            
+            switch (tabName) {
+                case 'gpts':
+                    response = await axiosInstance.get(`/api/custom-gpts/team/members/${member.id}/gpts`, {
+                        withCredentials: true
+                    });
+                    if (response.data && response.data.gpts) {
+                        setMemberGpts(response.data.gpts);
+                        dataCache.current.gpts = response.data.gpts;
+                    }
+                    break;
+                    
+                case 'activity':
+                    response = await axiosInstance.get(`/api/auth/users/${member.id}/activity`, {
+                        withCredentials: true
+                    });
+                    if (response.data && response.data.activities) {
+                        setUserActivity(response.data.activities);
+                        dataCache.current.activity = response.data.activities;
+                    }
+                    break;
+                    
+                case 'notes':
+                    response = await axiosInstance.get(`/api/auth/users/${member.id}/notes`, {
+                        withCredentials: true
+                    });
+                    if (response.data && response.data.notes) {
+                        setUserNotes(response.data.notes);
+                        dataCache.current.notes = response.data.notes;
+                    }
+                    break;
             }
-        };
+        } catch (error) {
+            console.error(`Error fetching ${tabName}:`, error);
+            // Don't use sample data - just show error state
+        } finally {
+            setLoading(prev => ({ ...prev, [tabName]: false }));
+        }
+    };
+
+    // IMPROVEMENT 3: Efficient tab switching - only load data when needed
+    useEffect(() => {
+        if (!isOpen || !member) return;
         
-        fetchAssignedGpts();
+        // When tab changes, fetch data for that tab if needed
+        fetchTabData(activeTab);
+        
     }, [isOpen, member, activeTab]);
 
-    // Fetch user activity when the activity tab is selected
+    // IMPROVEMENT 4: Clear cache when modal closes or member changes
     useEffect(() => {
-        if (!isOpen || !member || activeTab !== 'activity') return;
-        
-        const fetchUserActivity = async () => {
-            setLoading(prev => ({ ...prev, activity: true }));
-            try {
-                const response = await axiosInstance.get(`/api/auth/users/${member.id}/activity`, {
-                    withCredentials: true
-                });
-                
-                if (response.data && response.data.activities) {
-                    setUserActivity(response.data.activities);
-                }
-            } catch (error) {
-                console.error("Error fetching user activity:", error);
-                // Fallback to sample data for now
-                setUserActivity([
-                    { type: 'gpt_usage', gptName: 'Customer Support Assistant', messages: 14, date: new Date().toISOString() },
-                    { type: 'gpt_usage', gptName: 'Data Analyst', messages: 8, date: new Date(Date.now() - 86400000).toISOString() },
-                    { type: 'login', date: new Date(Date.now() - 172800000).toISOString() },
-                    { type: 'gpt_usage', gptName: 'Marketing Assistant', messages: 22, date: new Date(Date.now() - 259200000).toISOString() }
-                ]);
-            } finally {
-                setLoading(prev => ({ ...prev, activity: false }));
-            }
-        };
-        
-        fetchUserActivity();
-    }, [isOpen, member, activeTab]);
+        if (!isOpen) {
+            // Reset cache when modal closes
+            dataCache.current = {
+                gpts: null,
+                activity: null,
+                notes: null
+            };
+        }
+    }, [isOpen, member?.id]);
 
-    // Fetch user notes when the notes tab is selected
-    useEffect(() => {
-        if (!isOpen || !member || activeTab !== 'notes') return;
-        
-        const fetchUserNotes = async () => {
-            setLoading(prev => ({ ...prev, notes: true }));
-            try {
-                const response = await axiosInstance.get(`/api/auth/users/${member.id}/notes`, {
-                    withCredentials: true
-                });
-                
-                if (response.data && response.data.notes) {
-                    setUserNotes(response.data.notes);
-                }
-            } catch (error) {
-                console.error("Error fetching user notes:", error);
-                // Fallback to sample data for now
-                setUserNotes([
-                    { id: 1, text: 'Completed onboarding process, assigned initial GPTs for marketing tasks.', createdBy: 'Admin User', createdAt: new Date(Date.now() - 1209600000).toISOString() }
-                ]);
-            } finally {
-                setLoading(prev => ({ ...prev, notes: false }));
-            }
-        };
-        
-        fetchUserNotes();
-    }, [isOpen, member, activeTab]);
-
-    // Handle adding a new note
+    // Handle adding a new note - update cache
     const handleAddNote = async () => {
         if (!noteText.trim()) return;
         
@@ -127,7 +126,9 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
             });
             
             if (response.data && response.data.note) {
-                setUserNotes(prev => [response.data.note, ...prev]);
+                const newNotes = [response.data.note, ...userNotes];
+                setUserNotes(newNotes);
+                dataCache.current.notes = newNotes; // Update cache
                 setNoteText('');
                 toast.success('Note added successfully');
             }
@@ -137,14 +138,16 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
         }
     };
 
-    // Handle removing a note
+    // Handle removing a note - update cache
     const handleRemoveNote = async (noteId) => {
         try {
             await axiosInstance.delete(`/api/auth/users/${member.id}/notes/${noteId}`, {
                 withCredentials: true
             });
             
-            setUserNotes(prev => prev.filter(note => note.id !== noteId));
+            const updatedNotes = userNotes.filter(note => note.id !== noteId);
+            setUserNotes(updatedNotes);
+            dataCache.current.notes = updatedNotes; // Update cache
             toast.success('Note removed successfully');
         } catch (error) {
             console.error("Error removing note:", error);
@@ -152,14 +155,16 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
         }
     };
 
-    // Handle removing a GPT assignment
+    // Handle removing a GPT assignment - update cache
     const handleRemoveGpt = async (gptId) => {
         try {
             await axiosInstance.delete(`/api/custom-gpts/team/members/${member.id}/gpts/${gptId}`, {
                 withCredentials: true
             });
             
-            setMemberGpts(prev => prev.filter(gpt => gpt._id !== gptId));
+            const updatedGpts = memberGpts.filter(gpt => gpt._id !== gptId);
+            setMemberGpts(updatedGpts);
+            dataCache.current.gpts = updatedGpts; // Update cache
             toast.success('GPT unassigned successfully');
         } catch (error) {
             console.error("Error removing GPT assignment:", error);
@@ -167,13 +172,25 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
         }
     };
 
+    // IMPROVEMENT 5: Optimized handler for GPT assignment changes
+    const handleGptAssignmentChange = async () => {
+        try {
+            const response = await axiosInstance.get(`/api/custom-gpts/team/members/${member.id}/gpts`, {
+                withCredentials: true
+            });
+            
+            if (response.data && response.data.gpts) {
+                setMemberGpts(response.data.gpts);
+                dataCache.current.gpts = response.data.gpts; // Update cache
+            }
+        } catch (error) {
+            console.error("Error refreshing assigned GPTs:", error);
+        }
+    };
+
     // Add this function to handle assigning GPTs
     const handleAssignGpts = () => {
         setShowAssignGptsModal(true);
-    };
-
-    const handleGptAssignmentChange = () => {
-        fetchAssignedGpts();
     };
 
     if (!isOpen || !member) return null;

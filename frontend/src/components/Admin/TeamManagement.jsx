@@ -62,6 +62,10 @@ const TeamManagement = () => {
     const actionsMenuRef = useRef(null);
     const departmentFilterRef = useRef(null);
     const statusFilterRef = useRef(null);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const [cachedMembers, setCachedMembers] = useState({});
+    const [totalMembers, setTotalMembers] = useState(0);
     
     // Add responsive detection
     useEffect(() => {
@@ -92,48 +96,14 @@ const TeamManagement = () => {
         });
     };
     
-    // DEFINE fetchGptCounts FIRST
-    const fetchGptCounts = useCallback(async (currentMembers) => { // Accept members as argument
-        const membersToCount = currentMembers || teamMembers; 
+    // IMPROVEMENT 1: Combined data fetching in one call
+    const fetchTeamData = useCallback(async (refresh = false) => {
+        if (!refresh && teamMembers.length > 0) return; // Don't reload if data exists
         
-        if (!membersToCount || membersToCount.length === 0) {
-            return;
-        }
-        
-        try {
-            const response = await axiosInstance.get('/api/custom-gpts/team/gpt-counts', { 
-                withCredentials: true 
-            });
-            
-            
-            if (response.data?.success && response.data?.userGptCounts) {
-                const counts = response.data.userGptCounts;
-                
-                setTeamMembers(prev => {
-                    const baseMembers = currentMembers || prev; 
-                    const updatedMembers = baseMembers.map(member => {
-                        const count = counts[member.id] || 0;
-                        return {
-                            ...member,
-                            assignedGPTs: count
-                        };
-                    });
-                    return updatedMembers;
-                });
-            } else {
-                console.warn("GPT counts response was not successful or missing userGptCounts:", response.data);
-            }
-        } catch (err) {
-            console.error("Error fetching GPT assignments:", err);
-            toast.error("Could not load GPT assignment data");
-        }
-    }, []); // Empty dependency array is correct here
-
-    // NOW DEFINE fetchUsers
-    const fetchUsers = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await axiosInstance.get(`/api/auth/users`, { 
+            // Make a single API call to get users with their GPT counts
+            const response = await axiosInstance.get(`/api/auth/users/with-gpt-counts?page=${page}&limit=${pageSize}`, { 
                 withCredentials: true 
             });
             
@@ -153,32 +123,84 @@ const TeamManagement = () => {
                         joined: formatDate(user.createdAt),
                         lastActive: user.lastActive ? formatDate(user.lastActive) : 'Never',
                         status: isActive ? 'Active' : 'Inactive',
-                        assignedGPTs: 0
+                        assignedGPTs: user.gptCount || 0 // Use count from combined response
                     };
                 });
-                // Don't set state here directly if fetchGptCounts will do it
-                // setTeamMembers(formattedUsers); 
-                await fetchGptCounts(formattedUsers); // Pass the newly fetched users
+                
+                setTeamMembers(formattedUsers);
+                setTotalMembers(response.data.total || formattedUsers.length);
                 setError(null);
-            } else {
-                console.warn("API response missing users data, using sample data");
-                // setTeamMembers(getSampleTeamData()); 
+                
+                // Cache the data
+                setCachedMembers(prev => ({
+                    ...prev,
+                    [page]: formattedUsers
+                }));
             }
         } catch (err) {
             console.error("Error fetching team members:", err);
             setError("Failed to load team data. Please check your connection.");
-            // setTeamMembers(getSampleTeamData());
         } finally {
             setLoading(false);
         }
-    // fetchGptCounts MUST be defined before this point
-    }, [fetchGptCounts]); 
+    }, [page, pageSize]); 
 
-    // Initial mount effect - only fetches users
+    // Initial mount effect
     useEffect(() => {
-        fetchUsers();
-    }, [fetchUsers]); // Depends only on fetchUsers
+        // Check if we have cached data for this page
+        if (cachedMembers[page]) {
+            setTeamMembers(cachedMembers[page]);
+        } else {
+            fetchTeamData();
+        }
+    }, [fetchTeamData, page, cachedMembers]);
     
+    // IMPROVEMENT 2: Reduced polling frequency (30s instead of 10s)
+    useEffect(() => {
+        // Only set up interval if component is mounted and visible
+        const interval = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                fetchTeamData(true); // Force refresh
+            }
+        }, 30000); // Reduced from 10s to 30s
+        
+        return () => clearInterval(interval);
+    }, [fetchTeamData]);
+
+    // IMPROVEMENT 3: Handle GPT assignment changes more efficiently
+    const handleGptAssignmentChange = useCallback(async (memberId) => {
+        try {
+            // Only fetch data for the affected user
+            const response = await axiosInstance.get(`/api/auth/users/${memberId}/gpt-count`, { 
+                withCredentials: true 
+            });
+            
+            if (response.data && response.data.count !== undefined) {
+                // Update just this user's count in the state
+                setTeamMembers(prev => prev.map(member => 
+                    member.id === memberId 
+                        ? {...member, assignedGPTs: response.data.count}
+                        : member
+                ));
+                
+                // Update in cache too
+                setCachedMembers(prev => {
+                    const newCache = {...prev};
+                    Object.keys(newCache).forEach(pageKey => {
+                        newCache[pageKey] = newCache[pageKey].map(member => 
+                            member.id === memberId 
+                                ? {...member, assignedGPTs: response.data.count}
+                                : member
+                        );
+                    });
+                    return newCache;
+                });
+            }
+        } catch (err) {
+            console.error("Error updating GPT count:", err);
+        }
+    }, []);
+
     // Fetch pending invites count
     useEffect(() => {
         const fetchPendingInvites = async () => {
@@ -319,78 +341,31 @@ const TeamManagement = () => {
         </div>
     );
 
-    // Pass this function to the AssignGptsModal - it should trigger a recount
-    const handleGptAssignmentChange = useCallback(() => {
-        fetchGptCounts(teamMembers); 
-    }, [fetchGptCounts, teamMembers]);
-
-    // Effect to close dropdowns when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (actionsMenuRef.current && !actionsMenuRef.current.contains(event.target)) {
-                if (!event.target.closest(`[data-member-id="${showActionsMenu}"]`)) {
-                setShowActionsMenu(null);
-            }
-            }
-            if (departmentFilterRef.current && !departmentFilterRef.current.contains(event.target)) {
-                setShowDepartmentsDropdown(false);
-            }
-            if (statusFilterRef.current && !statusFilterRef.current.contains(event.target)) {
-                setShowStatusDropdown(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [showActionsMenu]);
-
-    // Add this useEffect for auto-refresh every 30 seconds
-    useEffect(() => {
-        // Only set up interval if component is mounted and visible
-        const interval = setInterval(() => {
-            if (document.visibilityState === 'visible') {
-                refreshUserData();
-            }
-        }, 10000); // More frequent updates (10 seconds instead of 30)
+    // Add pagination controls
+    const renderPagination = () => {
+        const totalPages = Math.ceil(totalMembers / pageSize);
         
-        return () => clearInterval(interval);
-    }, []);
-
-    // Update refreshUserData to call fetchGptCounts correctly
-    const refreshUserData = useCallback(async () => {
-        try {
-            const response = await axiosInstance.get(`/api/auth/users`, { 
-                withCredentials: true 
-            });
-            
-            if (response.data && response.data.users) {
-                const formattedUsers = response.data.users.map(user => {
-                    const isActive = user.lastActive 
-                        ? (new Date() - new Date(user.lastActive)) < 24 * 60 * 60 * 1000 
-                        : false;
-                    
-                    return {
-                        id: user._id,
-                        name: user.name,
-                        email: user.email,
-                        role: user.role,
-                        department: user.department || 'Not Assigned',
-                        position: user.position || '',
-                        joined: formatDate(user.createdAt),
-                        lastActive: user.lastActive ? formatDate(user.lastActive) : 'Never',
-                        status: isActive ? 'Active' : 'Inactive',
-                        assignedGPTs: 0
-                    };
-                });
-                setTeamMembers(formattedUsers);
-                await fetchGptCounts(formattedUsers);
-            }
-        } catch (err) {
-            console.error("Error refreshing users:", err);
-        }
-    }, [fetchGptCounts]);
+        return (
+            <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 py-3 sm:px-6 mt-4">
+                <div className="flex-1 flex justify-between sm:hidden">
+                    <button
+                        onClick={() => setPage(Math.max(1, page - 1))}
+                        disabled={page === 1}
+                        className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                    >
+                        Previous
+                    </button>
+                    <button
+                        onClick={() => setPage(Math.min(totalPages, page + 1))}
+                        disabled={page === totalPages}
+                        className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                    >
+                        Next
+                    </button>
+                </div>
+            </div>
+        );
+    };
 
     if (loading) {
         return <div className="flex justify-center items-center h-screen bg-white dark:bg-black"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div></div>;
@@ -558,6 +533,9 @@ const TeamManagement = () => {
                     )}
                 </div>
             
+            {/* Add pagination at the bottom */}
+            {!loading && !error && filteredMembers.length > 0 && renderPagination()}
+
             {/* Render action menus outside of the table completely */}
             {showActionsMenu && filteredMembers.map((member) => (
                 member.id === showActionsMenu && (
@@ -614,7 +592,7 @@ const TeamManagement = () => {
                 isOpen={showInviteModal}
                 onClose={() => setShowInviteModal(false)}
                     onInviteSent={() => {
-                        fetchUsers();
+                        fetchTeamData();
                         setPendingInvitesCount(prev => prev + 1);
                     }}
             />
