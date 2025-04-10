@@ -10,7 +10,7 @@
       {
         "src": "/(.*)",
         "dest": "index.js",
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         "headers": {
           "Access-Control-Allow-Origin": "https://agent-maker-frontend.vercel.app",
           "Access-Control-Allow-Credentials": "true",
