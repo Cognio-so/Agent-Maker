@@ -10,6 +10,7 @@ import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { axiosInstance } from '../../api/axiosInstance';
 import { useTheme } from '../../context/ThemeContext'; // Import useTheme
+import axios from 'axios';
 
 
 const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
@@ -202,10 +203,37 @@ const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
         "Marketing Assistant": "You are a helpful marketing assistant. Generate ad copy, social media posts, email campaigns, and suggest marketing strategies based on user goals and target audience.",
     };
 
-    // Save the custom GPT
-    const handleSaveGpt = async () => {
-        setIsSaving(true); // Start saving state for the button
+    // Update the triggerKnowledgeIndexing function in CreateCustomGpt.jsx
+    const triggerKnowledgeIndexing = async (gptId, fileUrls, email) => {
+        try {
+            const response = await axios.post(
+                `${process.env.REACT_APP_PYTHON_API_URL || "http://localhost:8000"}/index-knowledge`,
+                {
+                    file_urls: fileUrls,
+                    user_email: email || "user@example.com",
+                    gpt_name: formData.name,
+                    gpt_id: gptId,
+                    force_recreate: false
+                }
+            );
             
+            if (response.data.success) {
+                console.log(`KB indexing completed for collection: ${response.data.collection_name}`);
+                toast.success("Knowledge files indexed successfully");
+            } else {
+                console.error("KB indexing failed");
+                toast.warning("Knowledge file upload succeeded but indexing failed. Search functionality may be limited.");
+            }
+        } catch (error) {
+            console.error("Error triggering KB indexing:", error);
+            toast.warning("Knowledge files uploaded but indexing failed. Search functionality may be limited.");
+        }
+    };
+
+    // Modify handleSaveGpt to call the indexing function
+    const handleSaveGpt = async () => {
+        setIsSaving(true);
+        
         try {
             // Prepare form data for API
             const apiFormData = new FormData();
@@ -249,6 +277,16 @@ const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
                     }
                 );
                  successMessage = "Custom GPT created successfully!";
+            }
+            
+            // Get gptId and extract file URLs from response
+            const gptId = response.data.customGpt._id;
+            const fileUrls = response.data.customGpt.knowledgeFiles.map(file => file.fileUrl);
+            const userEmail = response.data.customGpt.createdBy.email || "user@example.com";
+            
+            // If there are knowledge files, trigger indexing
+            if (fileUrls.length > 0) {
+                triggerKnowledgeIndexing(gptId, fileUrls, userEmail);
             }
             
             if (response.status === 200 || response.status === 201) {

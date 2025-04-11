@@ -70,11 +70,6 @@ const AdminMessageInput = ({ onSubmit, onFileUpload, isLoading, currentGptName }
 
     return (
         <div className="w-full p-2 sm:p-4 bg-white dark:bg-black">
-            {currentGptName && (
-                <div className="text-xs text-center text-gray-400 dark:text-gray-500 mb-1.5">
-                    Chatting with: <span className="font-medium text-gray-600 dark:text-gray-400">{currentGptName}</span>
-                </div>
-            )}
             <form onSubmit={handleSubmit}>
                 <div className="bg-gray-100 dark:bg-[#1e1e1e] rounded-xl sm:rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700/50 relative group focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
                     <div className="flex flex-col px-3 sm:px-4 py-2 sm:py-3">

@@ -4,8 +4,85 @@ import { useParams, useNavigate } from 'react-router-dom';
 import AdminMessageInput from './AdminMessageInput';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { IoPersonCircleOutline, IoSettingsOutline, IoPersonOutline, IoArrowBack } from 'react-icons/io5';
+import { IoPersonCircleOutline, IoSettingsOutline, IoPersonOutline, IoArrowBack, IoClose } from 'react-icons/io5';
 import { axiosInstance } from '../../api/axiosInstance';
+import axios from 'axios';
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { FaFilePdf, FaFileWord, FaFileAlt, FaFile } from 'react-icons/fa';
+
+const backendUrl = "http://localhost:8000"; // Change if your backend is on a different URL
+
+const MarkdownStyles = () => (
+    <style dangerouslySetInnerHTML={{__html: `
+        .markdown-content {
+            line-height: 1.6;
+            width: 100%;
+        }
+        
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+        }
+        
+        .markdown-content h1:first-child,
+        .markdown-content h2:first-child,
+        .markdown-content h3:first-child {
+            margin-top: 0;
+        }
+        
+        .markdown-content code {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        }
+        
+        .markdown-content pre {
+            overflow-x: auto;
+            border-radius: 0.375rem;
+        }
+        
+        .markdown-content blockquote {
+            font-style: italic;
+            color: #6b7280;
+        }
+        
+        .markdown-content a {
+            text-decoration: none;
+        }
+        
+        .markdown-content a:hover {
+            text-decoration: underline;
+        }
+        
+        .markdown-content table {
+            border-collapse: collapse;
+        }
+        
+        .markdown-content img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .markdown-content hr {
+            border-top: 1px solid;
+            margin: 1em 0;
+        }
+        
+        /* Hide scrollbar but maintain functionality */
+        .hide-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;     /* Firefox */
+        }
+        
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;  /* Chrome, Safari, Opera */
+        }
+    `}} />
+);
 
 const AdminChat = () => {
     const { gptId } = useParams();
@@ -18,7 +95,17 @@ const AdminChat = () => {
     const [isFetchingGpt, setIsFetchingGpt] = useState(false);
     const [gptData, setGptData] = useState(null);
     const [messages, setMessages] = useState([]);
+    const [collectionName, setCollectionName] = useState(null);
     const messagesEndRef = useRef(null);
+    const [userDocuments, setUserDocuments] = useState([]);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [streamingMessage, setStreamingMessage] = useState(null);
+    const [uploadedFiles, setUploadedFiles] = useState([]);
+    const [backendAvailable, setBackendAvailable] = useState(null);
+    const [hasInteracted, setHasInteracted] = useState(false);
+    const [conversationMemory, setConversationMemory] = useState([]);
+    const [hasNotifiedGptOpened, setHasNotifiedGptOpened] = useState(false);
     
     // Use effect to handle user data changes
     useEffect(() => {
@@ -27,35 +114,98 @@ const AdminChat = () => {
         }
     }, [user]);
     
+    // Notify backend when GPT opens to trigger indexing
+    const notifyGptOpened = async (gptData, userData) => {
+        try {
+            if (!gptData || !userData || hasNotifiedGptOpened) return;
+            
+            const fileUrls = gptData.knowledgeFiles?.map(file => file.fileUrl) || [];
+            
+            const response = await axios.post(
+                `${backendUrl}/gpt-opened`,
+                {
+                    user_email: userData.email,
+                    gpt_name: gptData.name,
+                    gpt_id: gptData._id,
+                    file_urls: fileUrls,
+                    schema: {
+                        model: gptData.model,
+                        instructions: gptData.instructions,
+                        capabilities: gptData.capabilities
+                    }
+                },
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                }
+            );
+            
+            if (response.data.success) {
+                console.log("GPT opened notification successful");
+                setCollectionName(response.data.collection_name);
+                setHasNotifiedGptOpened(true);
+            }
+        } catch (error) {
+            console.error("Error notifying GPT opened:", error);
+        }
+    };
+    
     // Fetch GPT data if gptId is provided
     useEffect(() => {
-        if (gptId) {
+        // Add check for userData to ensure user is authenticated before fetching
+        if (gptId && userData) { 
             const fetchGptData = async () => {
                 try {
                     setIsFetchingGpt(true);
-                    const response = await axiosInstance.get(`/api/custom-gpts/${gptId}`, { withCredentials: true });
+                    const token = localStorage.getItem('authToken'); // or however you store your token
+                    
+                    const response = await axiosInstance.get(`/api/custom-gpts/${gptId}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        withCredentials: true
+                    });
                     
                     if (response.data.success) {
-                        setGptData(response.data.customGpt);
+                        const fetchedGptData = response.data.customGpt;
+                        setGptData(fetchedGptData);
                         setMessages([]);
+                        
+                        // Notify backend when GPT is opened
+                        notifyGptOpened(fetchedGptData, userData);
                     } else {
                         console.error("Failed to load GPT data, success false");
                         navigate(-1);
                     }
                 } catch (err) {
                     console.error("Error fetching GPT data:", err);
-                    navigate(-1);
+                    if (err.response?.status === 401) {
+                        // Handle unauthorized error - maybe redirect to login
+                        navigate('/login');
+                    } else {
+                        navigate(-1);
+                    }
                 } finally {
                     setIsFetchingGpt(false);
                 }
             };
             
             fetchGptData();
-        } else {
+        } else if (!gptId) { // Handle case where gptId is removed or absent
             setGptData(null);
             setMessages([]);
         }
-    }, [gptId, navigate]);
+        // Ensure userData is in the dependency array so the effect reruns when user logs in/out
+    }, [gptId, navigate, userData]);
+    
+    // Update the useEffect that calls notifyGptOpened
+    useEffect(() => {
+        if (gptData && userData && !hasNotifiedGptOpened) {
+            notifyGptOpened(gptData, userData);
+        }
+    }, [gptData, userData, hasNotifiedGptOpened]);
     
     const predefinedPrompts = [
         {
@@ -90,24 +240,96 @@ const AdminChat = () => {
                 timestamp: new Date()
             };
             
+            // Add to UI messages
             setMessages(prev => [...prev, userMessage]);
             
+            // Update conversation memory with relevant context
+            const updatedMemory = [...conversationMemory];
+            if (updatedMemory.length >= 10) {
+                // Keep only the most recent messages if memory gets too large
+                updatedMemory.splice(0, updatedMemory.length - 9);
+            }
+            updatedMemory.push({
+                role: 'user',
+                content: message,
+                timestamp: new Date().toISOString()
+            });
+            setConversationMemory(updatedMemory);
+            
             setIsLoading(true);
+            setHasInteracted(true);
             
-            setTimeout(() => {
-                const aiResponse = {
-                    id: Date.now() + 1,
-                    role: 'assistant',
-                    content: `Mock Response: "${message}" ${gptData ? `(via ${gptData.name})` : '(via General AI)'}`,
-                    timestamp: new Date()
-                };
+            // Create request payload with enhanced memory
+            const chatCollectionName = collectionName || gptData?._id || "default_collection";
+            const payload = {
+                message,
+                collection_name: chatCollectionName,
+                user_documents: userDocuments,
+                model: gptData?.model,
+                memory: updatedMemory, // Pass complete conversation memory
+                history: messages.slice(-6).map(msg => ({ // Pass recent messages as history
+                    role: msg.role,
+                    content: msg.content
+                }))
+            };
+            
+            // Try streaming first
+            try {
+                console.log("Attempting streaming response...");
+                const response = await fetch(`${backendUrl}/chat-stream`, {
+                    method: "POST",
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
                 
-                setMessages(prev => [...prev, aiResponse]);
-                setIsLoading(false);
-            }, 1000);
-            
+                if (response.ok) {
+                    console.log("Stream response OK, handling stream...");
+                    await handleStreamingResponse(response);
+                } else {
+                    console.error("Stream response not OK:", response.status, response.statusText);
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+            } catch (streamingError) {
+                console.warn("Streaming failed, falling back to regular chat API:", streamingError);
+                
+                // Fallback to regular chat API
+                const fallbackResponse = await axios.post(
+                    `${backendUrl}/chat`, 
+                    payload,
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    }
+                );
+                
+                console.log("Fallback response:", fallbackResponse.data);
+                
+                if (fallbackResponse.data && fallbackResponse.data.success && fallbackResponse.data.response) {
+                    const aiResponse = {
+                        id: Date.now() + 1,
+                        role: 'assistant',
+                        content: fallbackResponse.data.response,
+                        timestamp: new Date()
+                    };
+                    
+                    setMessages(prev => [...prev, aiResponse]);
+                }
+            }
         } catch (err) {
             console.error("Error in handleChatSubmit:", err);
+            // Set error in message list
+            const errorResponse = {
+                id: Date.now() + 1,
+                role: 'assistant',
+                content: "I'm sorry, I couldn't process your request at this time.",
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, errorResponse]);
+            setStreamingMessage(null); // Clear any partial streaming message
+        } finally {
             setIsLoading(false);
         }
     };
@@ -131,7 +353,247 @@ const AdminChat = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    const handleFileUpload = async (files) => {
+        if (!files.length || !gptData) return;
+        
+        try {
+            // Set uploading state to true
+            setIsUploading(true);
+            setUploadProgress(0);
+            // Store file information for display
+            setUploadedFiles(Array.from(files).map(file => ({
+                name: file.name,
+                size: file.size,
+                type: file.type
+            })));
+            
+            // Create FormData for file upload
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+            formData.append('user_email', userData?.email || 'user@example.com');
+            formData.append('gpt_id', gptData._id);
+            formData.append('gpt_name', gptData.name);
+            formData.append('collection_name', collectionName || gptData._id);
+            formData.append('is_user_document', 'true');
+            
+            // Use a faster progress simulation for better perceived performance
+            const startTime = Date.now();
+            const uploadDuration = 1500; // 1.5 seconds for initial upload phase
+            const progressInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                if (elapsed < uploadDuration) {
+                    // Fast progress to 60% during "upload" phase
+                    const progress = Math.min(60, (elapsed / uploadDuration) * 60);
+                    setUploadProgress(progress);
+                } else {
+                    // Then slower progress to 90% during "processing" phase
+                    setUploadProgress(prev => {
+                        if (prev < 90) {
+                            return prev + (90 - prev) * 0.08;
+                        }
+                        return prev;
+                    });
+                }
+            }, 100); // Update progress more frequently
+            
+            // Upload files to backend
+            const response = await axios.post(
+                `${backendUrl}/upload-chat-files`,
+                formData,
+                {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                    onUploadProgress: (progressEvent) => {
+                        // Only use real progress for the first 60%
+                        const percentCompleted = Math.round(
+                            (progressEvent.loaded * 60) / (progressEvent.total || 100)
+                        );
+                        // Cap at 60% since processing happens after upload
+                        setUploadProgress(Math.min(percentCompleted, 60));
+                    }
+                }
+            );
+            
+            // Clear the progress interval
+            clearInterval(progressInterval);
+            
+            // Complete the progress bar
+            setUploadProgress(100);
+            
+            // Small delay before removing the progress indicator
+            setTimeout(() => {
+                setIsUploading(false);
+            }, 500);
+            
+            if (response.data.success) {
+                // Track the user documents
+                setUserDocuments(response.data.file_urls || []);
+            } else {
+                throw new Error(response.data.message || "Failed to process files");
+            }
+        } catch (error) {
+            console.error("Error uploading files:", error);
+            
+            // Stop the animation
+            setIsUploading(false);
+        }
+    };
+
+    // Add a helper function to determine file icon
+    const getFileIcon = (filename) => {
+        if (!filename) return <FaFile className="text-white" />;
+        
+        const extension = filename.split('.').pop().toLowerCase();
+        
+        switch (extension) {
+            case 'pdf':
+                return <FaFilePdf className="text-white" />;
+            case 'doc':
+            case 'docx':
+                return <FaFileWord className="text-white" />;
+            case 'txt':
+                return <FaFileAlt className="text-white" />;
+            default:
+                return <FaFile className="text-white" />;
+        }
+    };
+
+    // Add function to handle removing uploaded file
+    const handleRemoveUploadedFile = (indexToRemove) => {
+        setUploadedFiles(prevFiles => prevFiles.filter((_, index) => index !== indexToRemove));
+    };
+
+    // Add this useEffect to check backend availability
+    useEffect(() => {
+        const checkBackendAvailability = async () => {
+            try {
+                // Change from HEAD request to / to a known endpoint that exists
+                await axios.get(`${backendUrl}/gpt-collection-info/test/test`);
+                setBackendAvailable(true);
+            } catch (error) {
+                // Even if the endpoint returns 404/400, the server is still running
+                // Only mark as offline for network errors
+                if (error.code === "ERR_NETWORK") {
+                    console.error("Backend server appears to be offline:", error);
+                    setBackendAvailable(false);
+                } else {
+                    // If we get any response (even error), server is running
+                    console.log("Backend server available but request failed:", error);
+                    setBackendAvailable(true);
+                }
+            }
+        };
+        
+        checkBackendAvailability();
+    }, []);
+
+    // Add this useEffect to log streaming message updates
+    useEffect(() => {
+        if (streamingMessage) {
+            console.log("Streaming message updated:", streamingMessage);
+        }
+    }, [streamingMessage]);
+
+    const handleStreamingResponse = async (response) => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                
+                if (done) {
+                    setStreamingMessage(prev => prev ? { ...prev, isStreaming: false } : null);
+                    break;
+                }
+                
+                const text = decoder.decode(value, {stream: true});
+                console.log("Raw streaming data:", text); // For debugging
+                
+                const lines = text.split('\n').filter(line => line.trim());
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const jsonStr = line.substring(6);
+                            const parsed = JSON.parse(jsonStr);
+                            
+                            if (parsed.error) {
+                                console.error("Streaming Error:", parsed.error);
+                                setStreamingMessage({
+                                    id: Date.now(),
+                                    role: 'assistant',
+                                    content: `Error: ${parsed.error}`,
+                                    isStreaming: false,
+                                    timestamp: new Date()
+                                });
+                                return;
+                            }
+                            
+                            if (parsed.done === true) {
+                                setStreamingMessage(prev => prev ? { ...prev, isStreaming: false } : null);
+                                return;
+                            }
+                            
+                            if (parsed.content) {
+                                setStreamingMessage((prev) => ({
+                                    id: prev?.id || Date.now(),
+                                    role: 'assistant',
+                                    content: prev ? prev.content + parsed.content : parsed.content,
+                                    isStreaming: true,
+                                    timestamp: prev?.timestamp || new Date()
+                                }));
+                            }
+                        } catch (e) {
+                            console.error("Error parsing streaming line:", e, "Line:", line);
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Error reading stream:", err);
+            setStreamingMessage({
+                id: Date.now(),
+                role: 'assistant',
+                content: "Error reading response stream.",
+                isStreaming: false,
+                timestamp: new Date()
+            });
+        }
+    };
+
+    // Add this useEffect above the return statement in your component
+    useEffect(() => {
+        // When a streaming message completes, add it to the messages array
+        if (streamingMessage && !streamingMessage.isStreaming) {
+            console.log("Adding completed streaming message to messages:", streamingMessage);
+            
+            // First add to main message list
+            setMessages(prev => {
+                // Check if message with same ID already exists to prevent duplicates
+                const exists = prev.some(m => m.id === streamingMessage.id);
+                if (exists) return prev;
+                return [...prev, { ...streamingMessage }];
+            });
+            
+            // Then update conversation memory
+            setConversationMemory(prev => [...prev, {
+                role: 'assistant',
+                content: streamingMessage.content,
+                timestamp: new Date().toISOString()
+            }]);
+            
+            // Finally clear the streaming message
+            setTimeout(() => setStreamingMessage(null), 100);
+        }
+    }, [streamingMessage]);
+
     return (
+        <>
+            <MarkdownStyles />
         <div className='flex flex-col h-screen bg-white dark:bg-black text-black dark:text-white overflow-hidden'>
             <div className="flex-shrink-0 bg-white dark:bg-black px-4 py-3 flex items-center justify-between">
                 <div className="w-10 h-10">
@@ -188,7 +650,7 @@ const AdminChat = () => {
                 </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col bg-white dark:bg-black">
+                <div className="flex-1 overflow-y-auto p-4 flex flex-col bg-white dark:bg-black hide-scrollbar">
                 <div className="w-full max-w-3xl mx-auto flex-1 flex flex-col space-y-4 pb-4">
                     {isFetchingGpt ? (
                         <div className="flex-1 flex items-center justify-center">
@@ -255,16 +717,67 @@ const AdminChat = () => {
                                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                 >
                                     <div 
-                                        className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${
+                                        className={`w-full max-w-[95%] rounded-2xl px-5 py-4 ${
                                             message.role === 'user' 
-                                                ? 'bg-blue-600 text-white rounded-br-none' 
-                                                : 'bg-gray-200 dark:bg-gray-700 text-black dark:text-white rounded-bl-none'
+                                                ? 'user-message-glossy text-white rounded-br-none' 
+                                                : 'assistant-message text-black dark:text-white rounded-bl-none'
                                         }`}
                                     >
+                                        {message.role === 'user' ? (
                                         <p className="whitespace-pre-wrap">{message.content}</p> 
+                                        ) : (
+                                            <div className="markdown-content">
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkGfm]}
+                                                    rehypePlugins={[rehypeRaw]}
+                                                    components={{
+                                                        h1: ({node, ...props}) => <h1 className="text-xl font-bold my-3" {...props} />,
+                                                        h2: ({node, ...props}) => <h2 className="text-lg font-bold my-2" {...props} />,
+                                                        h3: ({node, ...props}) => <h3 className="text-md font-bold my-2" {...props} />,
+                                                        h4: ({node, ...props}) => <h4 className="font-bold my-2" {...props} />,
+                                                        p: ({node, ...props}) => <p className="my-2" {...props} />,
+                                                        ul: ({node, ...props}) => <ul className="list-disc pl-5 my-2" {...props} />,
+                                                        ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-2" {...props} />,
+                                                        li: ({node, index, ...props}) => <li key={index} className="my-1" {...props} />,
+                                                        a: ({node, ...props}) => <a className="text-blue-400 hover:underline" {...props} />,
+                                                        blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-gray-500 dark:border-gray-400 pl-4 my-3 italic" {...props} />,
+                                                        code({node, inline, className, children, ...props}) {
+                                                            const match = /language-(\w+)/.exec(className || '');
+                                                            return !inline && match ? (
+                                                                <SyntaxHighlighter
+                                                                    style={atomDark}
+                                                                    language={match[1]}
+                                                                    PreTag="div"
+                                                                    className="rounded-md my-3"
+                                                                    {...props}
+                                                                >
+                                                                    {String(children).replace(/\n$/, '')}
+                                                                </SyntaxHighlighter>
+                                                            ) : (
+                                                                <code className={`${inline ? 'bg-gray-300 dark:bg-gray-600 px-1 py-0.5 rounded text-sm' : ''} ${className}`} {...props}>
+                                                                    {children}
+                                                                </code>
+                                                            );
+                                                        },
+                                                        table: ({node, ...props}) => (
+                                                            <div className="overflow-x-auto my-3">
+                                                                <table className="min-w-full border border-gray-400 dark:border-gray-500" {...props} />
+                                                            </div>
+                                                        ),
+                                                        thead: ({node, ...props}) => <thead className="bg-gray-300 dark:bg-gray-600" {...props} />,
+                                                        tbody: ({node, ...props}) => <tbody className="divide-y divide-gray-400 dark:divide-gray-500" {...props} />,
+                                                        tr: ({node, ...props}) => <tr className="hover:bg-gray-300 dark:hover:bg-gray-600" {...props} />,
+                                                        th: ({node, ...props}) => <th className="px-4 py-2 text-left font-medium" {...props} />,
+                                                        td: ({node, ...props}) => <td className="px-4 py-2" {...props} />,
+                                                    }}
+                                                >
+                                                    {message.content}
+                                                </ReactMarkdown>
+                                            </div>
+                                        )}
                                         <div 
-                                            className={`text-xs mt-1 text-right ${
-                                                message.role === 'user' ? 'text-blue-200/80' : 'text-gray-400/80'
+                                            className={`text-xs mt-2 text-right ${
+                                                message.role === 'user' ? 'text-blue-50/80' : 'text-gray-400/80'
                                             }`}
                                         >
                                             {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -273,12 +786,83 @@ const AdminChat = () => {
                                 </div>
                             ))}
                             
-                            {isLoading && messages.length > 0 && (
+                            {/* Display streaming message */}
+                            {streamingMessage && (
                                 <div className="flex justify-start">
-                                    <div className="max-w-[80%] rounded-2xl px-4 py-3 shadow-sm bg-gray-200 dark:bg-gray-700 rounded-bl-none flex items-center space-x-2">
-                                        <div className="w-2 h-2 bg-gray-500 dark:bg-gray-400 rounded-full animate-pulse delay-75"></div>
-                                        <div className="w-2 h-2 bg-gray-500 dark:bg-gray-400 rounded-full animate-pulse delay-150"></div>
-                                        <div className="w-2 h-2 bg-gray-500 dark:bg-gray-400 rounded-full animate-pulse delay-300"></div>
+                                    <div className="w-full max-w-[95%] rounded-2xl px-5 py-4 assistant-message text-black dark:text-white rounded-bl-none">
+                                        <div className="markdown-content">
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                rehypePlugins={[rehypeRaw]}
+                                                components={{
+                                                    h1: ({node, ...props}) => <h1 className="text-xl font-bold my-3" {...props} />,
+                                                    h2: ({node, ...props}) => <h2 className="text-lg font-bold my-2" {...props} />,
+                                                    h3: ({node, ...props}) => <h3 className="text-md font-bold my-2" {...props} />,
+                                                    h4: ({node, ...props}) => <h4 className="font-bold my-2" {...props} />,
+                                                    p: ({node, ...props}) => <p className="my-2" {...props} />,
+                                                    ul: ({node, ...props}) => <ul className="list-disc pl-5 my-2" {...props} />,
+                                                    ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-2" {...props} />,
+                                                    li: ({node, index, ...props}) => <li key={index} className="my-1" {...props} />,
+                                                    a: ({node, ...props}) => <a className="text-blue-400 hover:underline" {...props} />,
+                                                    blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-gray-500 dark:border-gray-400 pl-4 my-3 italic" {...props} />,
+                                                    code({node, inline, className, children, ...props}) {
+                                                        const match = /language-(\w+)/.exec(className || '');
+                                                        return !inline && match ? (
+                                                            <SyntaxHighlighter
+                                                                style={atomDark}
+                                                                language={match[1]}
+                                                                PreTag="div"
+                                                                className="rounded-md my-3"
+                                                                {...props}
+                                                            >
+                                                                {String(children).replace(/\n$/, '')}
+                                                            </SyntaxHighlighter>
+                                                        ) : (
+                                                            <code className={`${inline ? 'bg-gray-300 dark:bg-gray-600 px-1 py-0.5 rounded text-sm' : ''} ${className}`} {...props}>
+                                                                {children}
+                                                            </code>
+                                                        );
+                                                    },
+                                                    table: ({node, ...props}) => (
+                                                        <div className="overflow-x-auto my-3">
+                                                            <table className="min-w-full border border-gray-400 dark:border-gray-500" {...props} />
+                                                        </div>
+                                                    ),
+                                                    thead: ({node, ...props}) => <thead className="bg-gray-300 dark:bg-gray-600" {...props} />,
+                                                    tbody: ({node, ...props}) => <tbody className="divide-y divide-gray-400 dark:divide-gray-500" {...props} />,
+                                                    tr: ({node, ...props}) => <tr className="hover:bg-gray-300 dark:hover:bg-gray-600" {...props} />,
+                                                    th: ({node, ...props}) => <th className="px-4 py-2 text-left font-medium" {...props} />,
+                                                    td: ({node, ...props}) => <td className="px-4 py-2" {...props} />,
+                                                }}
+                                            >
+                                                {streamingMessage.content}
+                                            </ReactMarkdown>
+                                            
+                                            {streamingMessage.isStreaming && (
+                                                <div className="typing-animation mt-2 inline-flex items-center text-gray-400">
+                                                    <span></span>
+                                                    <span></span>
+                                                    <span></span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="text-xs mt-2 text-right text-gray-400/80">
+                                            {new Date(streamingMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Better loading animation - modified condition */}
+                            {isLoading && !streamingMessage && messages.length > 0 && (
+                                <div className="flex justify-start">
+                                    <div className="max-w-[95%] w-full rounded-2xl px-5 py-4 assistant-message text-black dark:text-white rounded-bl-none flex items-center">
+                                        <div className="typing-animation flex">
+                                            <span></span>
+                                            <span></span>
+                                            <span></span>
+                                        </div>
+                                        <span className="ml-3 text-sm text-gray-500 dark:text-gray-400">Searching knowledge base...</span>
                                     </div>
                                 </div>
                             )}
@@ -288,10 +872,67 @@ const AdminChat = () => {
                 </div>
             </div>
             
-            <div className="flex-shrink-0 w-[95%] max-w-3xl  mx-auto">
+                <div className="flex-shrink-0 w-[95%] max-w-3xl mx-auto">
+                    {/* File Upload Animation - more compact with reduced width */}
+                    {isUploading && (
+                        <div className="mb-1 file-upload-card max-w-md bg-white dark:bg-gray-800/90 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700/30 overflow-hidden">
+                            <div className="p-1.5 flex items-center">
+                                <div className="w-6 h-6 flex items-center justify-center relative mr-2">
+                                    <svg className="w-6 h-6 animate-spin text-blue-500" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-blue-600 dark:text-blue-400">{Math.round(uploadProgress)}%</span>
+                                </div>
+                                <div className="flex-1 truncate">
+                                    <div className="text-xs font-medium text-gray-900 dark:text-white flex items-center">
+                                        Processing
+                                        <span className="ml-1 text-[10px] text-gray-500">{uploadedFiles[0]?.name.substring(0, 12)}...</span>
+                                        {uploadedFiles.length > 1 && <span className="text-[10px] text-gray-400 ml-1">+{uploadedFiles.length - 1}</span>}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Show uploaded files with more compact styling */}
+                    {uploadedFiles.length > 0 && !isUploading && !hasInteracted && (
+                        <div className="mb-0.5">
+                            {uploadedFiles.map((file, index) => (
+                                <div key={`${file.name}-${index}`} className="flex items-center py-1 px-2 bg-gray-100 dark:bg-gray-800/70 rounded-lg mb-0.5 max-w-[25%]">
+                                    <div className="w-5 h-5 flex items-center justify-center mr-1.5">
+                                        {file.type.includes('pdf') ? 
+                                            <FaFilePdf size={12} className="text-red-500" /> : 
+                                            file.type.includes('word') || file.name.endsWith('.docx') || file.name.endsWith('.doc') ? 
+                                            <FaFileWord size={12} className="text-blue-500" /> : 
+                                            <FaFileAlt size={12} className="text-gray-500" />
+                                        }
+                                    </div>
+                                    <div className="flex-1 truncate">
+                                        <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                                            {file.name}
+                                        </div>
+                                    </div>
+                                    <div className="text-[10px] text-gray-500 ml-1 whitespace-nowrap">
+                                        {file.size ? `${Math.round(file.size / 1024)} KB` : ''}
+                                    </div>
+                                    <button
+                                        onClick={() => handleRemoveUploadedFile(index)}
+                                        className="ml-2 text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400"
+                                        aria-label="Remove file"
+                                    >
+                                        <IoClose size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                 <AdminMessageInput
                     onSubmit={handleChatSubmit}
+                        onFileUpload={handleFileUpload}
                     isLoading={isLoading}
+                        currentGptName={gptData?.name}
                 />
             </div>
             
@@ -302,6 +943,7 @@ const AdminChat = () => {
                 />
             )}
         </div>
+        </>
     );
 };
 
