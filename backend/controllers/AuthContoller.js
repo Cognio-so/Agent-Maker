@@ -110,7 +110,6 @@ const googleAuthCallback = (req, res, next) => {
         return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=${encodeURIComponent(info?.message || 'google_auth_failed')}`);
     }
 
-    
     // User authenticated successfully by Google Strategy
     try {
         // Update lastActive for Google login
@@ -119,20 +118,25 @@ const googleAuthCallback = (req, res, next) => {
 
         // Generate tokens
         const accessToken = generateAccessToken(user._id);
+        // Set secure and httpOnly flags to false for development
         generateRefreshTokenAndSetCookie(res, user._id);
         
-
-        // Redirect to a dedicated frontend callback handler page/route
-        const feRedirectUrl = new URL(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/callback`);
-        feRedirectUrl.searchParams.set('accessToken', accessToken);
-        feRedirectUrl.searchParams.set('user', JSON.stringify({
+        // Set additional cookie for SameSite issue (optional)
+        const userData = {
             _id: user._id,
             name: user.name,
             email: user.email,
             profilePic: user.profilePic,
             role: user.role
-        }));
+        };
 
+        // Redirect to a dedicated frontend callback handler page/route
+        const feRedirectUrl = new URL(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/callback`);
+        feRedirectUrl.searchParams.set('accessToken', accessToken);
+        feRedirectUrl.searchParams.set('user', JSON.stringify(userData));
+
+        // Log successful authentication
+        console.log("Google auth successful, redirecting to:", feRedirectUrl.toString());
         return res.redirect(feRedirectUrl.toString());
 
     } catch (error) {

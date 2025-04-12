@@ -28,22 +28,42 @@ export const AuthProvider = ({ children }) => {
   const fetchUser = useCallback(async () => {
     const currentToken = getAccessToken(); 
     if (!currentToken) {
-      setUser(null);
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) {
+        try {
+          setUser(JSON.parse(savedUser));
+          const response = await axiosInstance.post('/api/auth/refresh-token');
+          if (response.data && response.data.accessToken) {
+            updateAccessToken(response.data.accessToken);
+          }
+        } catch (e) {
+          console.error("Failed to use saved user data:", e);
+          setUser(null);
+          localStorage.removeItem('user');
+        }
+      } else {
+        setUser(null);
+      }
       setLoading(false);
       return; 
     }
+    
     setLoading(true); 
-     try {
+    try {
         const response = await axiosInstance.get('/api/auth/me');
         if (response.data) {
             setUser(response.data);
+            localStorage.setItem('user', JSON.stringify(response.data));
         } else {
-             updateAccessToken(null); 
-             setUser(null);
+            updateAccessToken(null); 
+            setUser(null);
+            localStorage.removeItem('user');
         }
     } catch (err) {
+        console.error("Error fetching user:", err);
         updateAccessToken(null);
         setUser(null);
+        localStorage.removeItem('user');
     } finally {
         setLoading(false);
     }
@@ -59,15 +79,21 @@ export const AuthProvider = ({ children }) => {
     }, [accessToken, fetchUser]); 
 
    const handleAuthCallback = useCallback((token, userData) => {
-        updateAccessToken(token); 
-        setUser(userData);        
-        setLoading(false);        
-        if (userData?.role === 'admin') {
-            navigate('/admin', { replace: true });
-        } else {
-            navigate('/employee', { replace: true });
-        }
-   }, [navigate, updateAccessToken]);
+    updateAccessToken(token);
+    setUser(userData);
+    setLoading(false);
+    
+    console.log("Auth callback processed with token:", !!token);
+    console.log("User role:", userData?.role);
+    
+    localStorage.setItem('user', JSON.stringify(userData));
+    
+    if (userData?.role === 'admin') {
+        navigate('/admin', { replace: true });
+    } else {
+        navigate('/employee', { replace: true });
+    }
+}, [navigate, updateAccessToken]);
 
 
   const login = async (email, password) => {

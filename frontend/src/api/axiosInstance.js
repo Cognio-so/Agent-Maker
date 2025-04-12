@@ -35,6 +35,10 @@ const removeAccessToken = () => {
 // Add request interceptor to attach token to every request
 axiosInstance.interceptors.request.use(
     (config) => {
+        // Ensure withCredentials is set for all requests
+        config.withCredentials = true;
+        
+        // Get the token from localStorage
         const token = getAccessToken();
         if (token) {
             config.headers['Authorization'] = `Bearer ${token}`;

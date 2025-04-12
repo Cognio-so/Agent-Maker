@@ -6,15 +6,22 @@ const generateAccessToken = (userId) => {
 };
 
 const generateRefreshTokenAndSetCookie = (res, userId) => {
-    const refreshToken = jwt.sign({ userId }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '7d' }); // e.g., 7 days
-
+    const refreshToken = jwt.sign(
+        { userId },
+        process.env.REFRESH_TOKEN_SECRET,
+        { expiresIn: '7d' }
+    );
+    
+    // Set the cookie with more permissive settings
     res.cookie('refreshToken', refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-        sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax', // 'None' for cross-site, 'Lax' for development
-        path: '/api/auth/refresh', // Scope cookie to the refresh token path
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        secure: process.env.NODE_ENV === 'production', // Only use secure in production
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Use 'none' in production, 'lax' in development
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+        path: '/' // Ensure cookie is available across your domain
     });
+    
+    return refreshToken;
 };
 
 // Clears the Refresh Token cookie
