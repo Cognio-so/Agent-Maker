@@ -32,6 +32,23 @@ const removeAccessToken = () => {
     delete axiosInstance.defaults.headers.common['Authorization'];
 };
 
+// Track if we're currently refreshing the token
+let isRefreshing = false;
+// Store pending requests that should be retried after token refresh
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+    failedQueue.forEach(prom => {
+        if (error) {
+            prom.reject(error);
+        } else {
+            prom.resolve(token);
+        }
+    });
+    
+    failedQueue = [];
+};
+
 // Add request interceptor to attach token to every request
 axiosInstance.interceptors.request.use(
     (config) => {
@@ -55,13 +72,57 @@ axiosInstance.interceptors.response.use(
     (response) => {
         return response;
     },
-    (error) => {
-        // Handle authentication errors
-        if (error.response && error.response.status === 401) {
-            console.error('Authentication error detected by interceptor');
-            // Optional: Clear token and redirect to login upon 401
-            // removeAccessToken(); 
-            // window.location.href = '/login'; 
+    async (error) => {
+        const originalRequest = error.config;
+        
+        // Don't retry if we already tried or it's a refresh token request
+        if (error.response?.status === 401 && !originalRequest._retry && 
+            !originalRequest.url.includes('/api/auth/refresh-token')) {
+            
+            if (isRefreshing) {
+                // If refresh is in progress, queue this request
+                return new Promise((resolve, reject) => {
+                    failedQueue.push({ resolve, reject });
+                }).then(token => {
+                    originalRequest.headers['Authorization'] = `Bearer ${token}`;
+                    return axios(originalRequest);
+                }).catch(err => {
+                    return Promise.reject(err);
+                });
+            }
+            
+            originalRequest._retry = true;
+            isRefreshing = true;
+            
+            try {
+                // Use the correct refresh endpoint from AuthContext
+                const response = await axios.post(`${baseURL}/api/auth/refresh-token`, {}, 
+                    { withCredentials: true });
+                
+                if (response.data && response.data.accessToken) {
+                    const newToken = response.data.accessToken;
+                    setAccessToken(newToken);
+                    
+                    // Process any queued requests with the new token
+                    processQueue(null, newToken);
+                    
+                    // Update the current request and retry
+                    originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+                    return axios(originalRequest);
+                } else {
+                    processQueue(new Error('Failed to refresh token'));
+                    removeAccessToken();
+                    // Don't redirect here - let the auth context handle that
+                    return Promise.reject(error);
+                }
+            } catch (refreshError) {
+                processQueue(refreshError);
+                removeAccessToken();
+                // Don't redirect here - let the auth context handle that
+                return Promise.reject(refreshError);
+            } finally {
+                isRefreshing = false;
+            }
         }
         
         return Promise.reject(error);
