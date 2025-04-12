@@ -72,41 +72,85 @@ const AssignGptsModal = ({ isOpen, onClose, teamMember, onAssignmentChange }) =>
     // Assign/Unassign GPTs based on the difference between initial and final selections
     const handleSaveChanges = async () => {
         setSaving(true);
+        let errors = [];
+        
         try {
-            const initialAssignedIds = assignedGptIds; // IDs assigned when modal opened
-            const finalSelectedIds = locallySelectedIds; // IDs selected when saving
+            const initialAssignedIds = assignedGptIds;
+            const finalSelectedIds = locallySelectedIds;
 
             const idsToAssign = [...finalSelectedIds].filter(id => !initialAssignedIds.has(id));
             const idsToUnassign = [...initialAssignedIds].filter(id => !finalSelectedIds.has(id));
 
-            const assignPromises = idsToAssign.map(gptId =>
-                axiosInstance.post(`/api/custom-gpts/team/members/${teamMember.id}/gpts`, { gptId }, { withCredentials: true })
-            );
+            console.log("Team member ID:", teamMember.id);
+            console.log("IDs to assign:", idsToAssign);
+            console.log("IDs to unassign:", idsToUnassign);
 
-             const unassignPromises = idsToUnassign.map(gptId =>
-                axiosInstance.delete(`/api/custom-gpts/team/members/${teamMember.id}/gpts/${gptId}`, { withCredentials: true })
-            );
+            // Process assignments one by one instead of using Promise.all
+            for (const gptId of idsToAssign) {
+                try {
+                    // Ensure we're using the correct content type and body format
+                    await axiosInstance.post(
+                        `/api/custom-gpts/team/members/${teamMember.id}/gpts`,
+                        { gptId }, // Make sure this matches exactly what the backend expects
+                        { 
+                            withCredentials: true,
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        }
+                    );
+                    console.log(`Successfully assigned GPT ${gptId}`);
+                } catch (err) {
+                    console.error(`Failed to assign GPT ${gptId}:`, err.response?.data || err.message);
+                    errors.push({ type: 'assign', gptId, error: err.response?.data?.message || err.message });
+                }
+            }
 
+            // Process unassignments one by one
+            for (const gptId of idsToUnassign) {
+                try {
+                    await axiosInstance.delete(
+                        `/api/custom-gpts/team/members/${teamMember.id}/gpts/${gptId}`,
+                        { withCredentials: true }
+                    );
+                    console.log(`Successfully unassigned GPT ${gptId}`);
+                } catch (err) {
+                    console.error(`Failed to unassign GPT ${gptId}:`, err.response?.data || err.message);
+                    errors.push({ type: 'unassign', gptId, error: err.response?.data?.message || err.message });
+                }
+            }
 
-            await Promise.all([...assignPromises, ...unassignPromises]);
+            // Determine message based on results
+            if (errors.length === 0) {
+                let successMessage = "Assignments updated successfully.";
+                if (idsToAssign.length > 0 && idsToUnassign.length === 0) {
+                    successMessage = `Assigned ${idsToAssign.length} GPT(s).`;
+                } else if (idsToUnassign.length > 0 && idsToAssign.length === 0) {
+                    successMessage = `Unassigned ${idsToUnassign.length} GPT(s).`;
+                } else if (idsToAssign.length > 0 && idsToUnassign.length > 0) {
+                    successMessage = `Assigned ${idsToAssign.length}, Unassigned ${idsToUnassign.length} GPT(s).`;
+                }
+                toast.success(successMessage);
+            } else {
+                // Some operations failed
+                if (errors.length < (idsToAssign.length + idsToUnassign.length)) {
+                    // Partial success
+                    toast.warning(`Some operations failed. ${errors.length} error(s) occurred.`);
+                } else {
+                    // All operations failed
+                    toast.error("Failed to update assignments. Please try again.");
+                }
+            }
 
-             let successMessage = "Assignments updated successfully.";
-             if (idsToAssign.length > 0 && idsToUnassign.length === 0) {
-                 successMessage = `Assigned ${idsToAssign.length} GPT(s).`;
-             } else if (idsToUnassign.length > 0 && idsToAssign.length === 0) {
-                 successMessage = `Unassigned ${idsToUnassign.length} GPT(s).`;
-             } else if (idsToAssign.length > 0 && idsToUnassign.length > 0) {
-                 successMessage = `Assigned ${idsToAssign.length}, Unassigned ${idsToUnassign.length} GPT(s).`;
-             }
-
-            toast.success(successMessage);
-            if (onAssignmentChange) { // Call the callback if provided
-                 onAssignmentChange();
-             }
+            // Always call the callback, even if there were some errors
+            if (onAssignmentChange) {
+                onAssignmentChange(teamMember.id);
+            }
+            
             onClose();
         } catch (error) {
-            console.error("Error updating assignments:", error);
-            toast.error(`Failed to update assignments: ${error.response?.data?.message || error.message}`);
+            console.error("Error in handleSaveChanges:", error);
+            toast.error(`Failed to update assignments: ${error.message}`);
         } finally {
             setSaving(false);
         }

@@ -4,41 +4,51 @@ const connectDB = require('../lib/db');
 
 const protectRoute = async (req, res, next) => {
     let token;
-    // Check for Authorization header (Bearer token)
+    
+    // Log the headers to debug authentication issues
+    console.log('Auth headers:', req.headers.authorization);
+    
+    // Check for token in Authorization header
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        try {
-            // Ensure database is connected before proceeding
-            await connectDB();
-
-            // Get token from header
-            token = req.headers.authorization.split(' ')[1];
-
-            // Verify access token
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-            // Get user from the token (excluding password)
-            req.user = await User.findById(decoded.userId).select('-password');
-
-            if (!req.user) {
-                 return res.status(401).json({ message: 'Not authorized, user not found' });
-            }
-
-            next();
-        } catch (error) {
-             console.error('Auth middleware error:', error.message);
-             if (error.name === 'JsonWebTokenError') {
-                 return res.status(401).json({ message: 'Not authorized, invalid token' });
-             }
-             if (error.name === 'TokenExpiredError') {
-                 return res.status(401).json({ message: 'Not authorized, token expired' });
-             }
-             // Generic server error for other issues
-            return res.status(500).json({ message: 'Server error during authentication' });
-        }
+        token = req.headers.authorization.split(' ')[1];
+    } 
+    // Also check for token in cookies as fallback
+    else if (req.cookies && req.cookies.token) {
+        token = req.cookies.token;
     }
-
+    
     if (!token) {
-        res.status(401).json({ message: 'Not authorized, no token provided' });
+        console.log('No token found in request');
+        return res.status(401).json({
+            success: false,
+            message: 'Please log in to access this resource'
+        });
+    }
+    
+    try {
+        // Verify the token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        // Find user by id (excluding password)
+        const user = await User.findById(decoded.id).select('-password');
+        
+        if (!user) {
+            console.log('User not found for token:', decoded.id);
+            return res.status(401).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+        
+        // Add user to request object
+        req.user = user;
+        next();
+    } catch (error) {
+        console.error('JWT verification failed:', error.message);
+        return res.status(401).json({
+            success: false,
+            message: 'Invalid or expired token. Please log in again.'
+        });
     }
 };
 

@@ -151,10 +151,72 @@ const CollectionsPage = () => {
         }
     }, []);
 
-    const handleChatClick = useCallback((gptId, e) => {
-        e.stopPropagation(); 
-        navigate(`/user/chat?gptId=${gptId}`);
-    }, [navigate]);
+    const handleChatClick = useCallback(async (gptId, e) => {
+        e.stopPropagation();
+        
+        // Validate gptId
+        if (!gptId) {
+            console.error("Invalid GPT ID");
+            return;
+        }
+        
+        // Find the selected GPT data
+        const selectedGpt = assignedGpts.find(gpt => gpt._id === gptId);
+        
+        // Even if we can't find the GPT data, still allow navigation
+        // but log the error for debugging
+        if (!selectedGpt) {
+            console.warn("GPT not found in collection, navigating anyway");
+            navigate(`/user/chat?gptId=${gptId}`);
+            return;
+        }
+        
+        try {
+            // Notify backend that this GPT is being opened (pre-load)
+            const backendUrl = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
+            
+            // Only attempt notification if we have a backend URL
+            if (backendUrl) {
+                try {
+                    const payload = {
+                        user_email: "user@example.com", // Fallback email
+                        gpt_name: selectedGpt.name || "Unknown GPT",
+                        gpt_id: selectedGpt._id,
+                        file_urls: selectedGpt.files || [],
+                        schema: {
+                            model: selectedGpt.model || "gpt-4o-mini"
+                        }
+                    };
+                    
+                    // Non-blocking notification
+                    fetch(`${backendUrl}/gpt-opened`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload)
+                    }).then(response => {
+                        if (response.ok) {
+                            console.log("GPT opened notification sent before navigation");
+                        } else {
+                            console.warn("Backend responded with error, will retry in chat");
+                        }
+                    }).catch(err => {
+                        console.warn("Failed to notify backend about GPT opening, will retry in chat:", err);
+                    });
+                } catch (notifyErr) {
+                    console.warn("Error preparing GPT notification:", notifyErr);
+                    // Continue to navigation
+                }
+            }
+        } catch (err) {
+            console.error("Error with pre-loading GPT:", err);
+            // Continue to navigation
+        } finally {
+            // Always navigate to the chat page
+            navigate(`/user/chat?gptId=${gptId}`);
+        }
+    }, [navigate, assignedGpts]);
     
     const handleSearchChange = useCallback((e) => setSearchTerm(e.target.value), []);
     const toggleSortOptions = useCallback(() => setShowSortOptions(prev => !prev), []);

@@ -168,37 +168,59 @@ const TeamManagement = () => {
     }, [fetchTeamData]);
 
     // IMPROVEMENT 3: Handle GPT assignment changes more efficiently
-    const handleGptAssignmentChange = useCallback(async (memberId) => {
-        try {
-            // Only fetch data for the affected user
-            const response = await axiosInstance.get(`/api/auth/users/${memberId}/gpt-count`, { 
-                withCredentials: true 
-            });
-            
-            if (response.data && response.data.count !== undefined) {
-                // Update just this user's count in the state
-                setTeamMembers(prev => prev.map(member => 
-                    member.id === memberId 
-                        ? {...member, assignedGPTs: response.data.count}
-                        : member
-                ));
-                
-                // Update in cache too
-                setCachedMembers(prev => {
-                    const newCache = {...prev};
-                    Object.keys(newCache).forEach(pageKey => {
-                        newCache[pageKey] = newCache[pageKey].map(member => 
-                            member.id === memberId 
-                                ? {...member, assignedGPTs: response.data.count}
-                                : member
-                        );
-                    });
-                    return newCache;
-                });
-            }
-        } catch (err) {
-            console.error("Error updating GPT count:", err);
+    const handleGptAssignmentChange = useCallback((memberId) => {
+        // Convert to standard pattern if it's a MongoDB ObjectId string
+        if (typeof memberId === 'string' && /^[0-9a-fA-F]{24}$/.test(memberId)) {
+            console.log("Valid MongoDB ObjectId detected:", memberId);
+        } else if (typeof memberId !== 'string') {
+            console.error("Invalid member ID type:", typeof memberId);
+            return;
         }
+        
+        const fetchUpdatedCount = async () => {
+            try {
+                console.log("Fetching updated GPT count for member:", memberId);
+                
+                // Get the updated count for this user
+                const response = await axiosInstance.get(`/api/auth/users/${memberId}/gpt-count`, { 
+                    withCredentials: true 
+                });
+                
+                if (response.data && typeof response.data.count !== 'undefined') {
+                    console.log(`User ${memberId} now has ${response.data.count} GPTs assigned`);
+                    
+                    // Update this member's GPT count in the state
+                    setTeamMembers(prev => prev.map(member => 
+                        member.id === memberId 
+                            ? {...member, assignedGPTs: response.data.count}
+                            : member
+                    ));
+                    
+                    // Also update the count in cache
+                    setCachedMembers(prev => {
+                        const newCache = {...prev};
+                        Object.keys(newCache).forEach(pageKey => {
+                            if (Array.isArray(newCache[pageKey])) {
+                                newCache[pageKey] = newCache[pageKey].map(member => 
+                                    member.id === memberId 
+                                        ? {...member, assignedGPTs: response.data.count}
+                                        : member
+                                );
+                            }
+                        });
+                        return newCache;
+                    });
+                } else {
+                    console.warn("Invalid response format for GPT count:", response.data);
+                }
+            } catch (err) {
+                console.error("Error updating GPT count:", err);
+                // Don't show a toast here - the user has already closed the modal
+            }
+        };
+        
+        // Call the async function
+        fetchUpdatedCount();
     }, []);
 
     // Fetch pending invites count

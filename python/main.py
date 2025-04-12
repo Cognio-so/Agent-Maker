@@ -343,6 +343,9 @@ async def chat_stream(request: ChatRequest):
         # Use streaming implementation
         from KB_indexer import perform_rag_query_stream
         
+        # Add better debugging to help diagnose the issue
+        print(f"Stream request with: model={model}, collection={collection_name}")
+        
         return await perform_rag_query_stream(
             query=message,
             base_collection_name=collection_name,
@@ -363,6 +366,10 @@ async def chat_stream(request: ChatRequest):
         print(traceback.format_exc())
         
         async def error_response():
+            import traceback
+            trace = traceback.format_exc()
+            print(f"Detailed error traceback: {trace}")
+            yield f'data: {{"content": "Error processing your request: {str(e)}"}}\n\n'
             yield f'data: {{"error": "Error in streaming: {str(e)}"}}\n\n'
             yield f'data: {{"done": true}}\n\n'
         

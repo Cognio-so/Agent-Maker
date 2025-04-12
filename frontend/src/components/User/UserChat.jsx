@@ -23,6 +23,7 @@ const UserChat = () => {
     const [gptData, setGptData] = useState(null);
     const [messages, setMessages] = useState([]);
     const messagesEndRef = useRef(null);
+    const [collectionName, setCollectionName] = useState('');
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -35,33 +36,73 @@ const UserChat = () => {
     }, [user]);
     
     useEffect(() => {
-        if (gptId) {
-            const fetchGptData = async () => {
-                try {
-                    setIsFetchingGpt(true);
-                    setMessages([]);
-                    const response = await axiosInstance.get(`/api/custom-gpts/user/assigned/${gptId}`, { withCredentials: true });
-                    
-                    if (response.data.success) {
-                        setGptData(response.data.customGpt);
-                    } else {
-                        console.error("Failed to load GPT data, success false");
-                        navigate('/user/dashboard');
-                    }
-                } catch (err) {
-                    console.error("Error fetching GPT data:", err);
-                    navigate('/user/dashboard');
-                } finally {
-                    setIsFetchingGpt(false);
-                }
-            };
-            
-            fetchGptData();
-        } else {
+        if (!gptId) {
             setGptData(null);
             setMessages([]);
+            return;
         }
-    }, [gptId, navigate]);
+        
+        const fetchGptData = async () => {
+            try {
+                setIsFetchingGpt(true);
+                setMessages([]);
+                
+                const response = await axiosInstance.get(`/api/custom-gpts/user/assigned/${gptId}`, { 
+                    withCredentials: true 
+                });
+                
+                if (response.data && response.data.success && response.data.customGpt) {
+                    setGptData(response.data.customGpt);
+                    
+                    // Create a collection name for RAG
+                    const sanitizedEmail = (userData?.email || 'user').replace(/[^a-zA-Z0-9]/g, '_');
+                    const sanitizedGptName = (response.data.customGpt.name || 'gpt').replace(/[^a-zA-Z0-9]/g, '_');
+                    const collectionName = `kb_${sanitizedEmail}_${sanitizedGptName}_${gptId}`;
+                    setCollectionName(collectionName);
+                    
+                    // Try to notify backend (non-blocking)
+                    try {
+                        notifyGptOpened(response.data.customGpt, userData)
+                            .then(result => console.log("GPT opened notification result:", result))
+                            .catch(notifyErr => console.warn("Failed to notify GPT opened:", notifyErr));
+                    } catch (notifyErr) {
+                        console.warn("Error preparing GPT notification:", notifyErr);
+                    }
+                } else {
+                    // Handle case where the API returned success: false or missing customGpt
+                    console.warn("Failed to load GPT data or invalid response format:", response.data);
+                    
+                    // Set a fallback GPT object
+                    setGptData({
+                        _id: gptId,
+                        name: "GPT Assistant",
+                        description: "This GPT may not be available right now.",
+                        model: "gpt-4o-mini"
+                    });
+                    
+                    // Set a fallback collection name
+                    setCollectionName(`kb_user_${gptId}`);
+                }
+            } catch (err) {
+                console.error("Error fetching GPT data:", err);
+                
+                // Set a fallback GPT object
+                setGptData({
+                    _id: gptId,
+                    name: "GPT Assistant",
+                    description: "This GPT may not be available right now.",
+                    model: "gpt-4o-mini"
+                });
+                
+                // Set a fallback collection name
+                setCollectionName(`kb_user_${gptId}`);
+            } finally {
+                setIsFetchingGpt(false);
+            }
+        };
+        
+        fetchGptData();
+    }, [gptId, userData]);
     
     const predefinedPrompts = [
         {
@@ -145,6 +186,65 @@ const UserChat = () => {
     };
 
     const showWebSearch = gptData?.capabilities?.webBrowsing === true;
+
+    const notifyGptOpened = async (gptData, userData) => {
+        try {
+            if (!gptData) return false;
+            
+            // Check backend availability but don't block if check fails
+            let isAvailable = true;
+            try {
+                const backendUrl = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
+                const checkResponse = await fetch(`${backendUrl}/`);
+                isAvailable = checkResponse.ok;
+            } catch (e) {
+                isAvailable = false;
+            }
+            
+            if (!isAvailable) {
+                console.warn("Backend appears to be unavailable");
+                return false;
+            }
+            
+            const backendUrl = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
+            
+            const payload = {
+                user_email: userData?.email || 'user@example.com',
+                gpt_name: gptData.name || 'Unnamed GPT',
+                gpt_id: gptData._id,
+                file_urls: gptData.files || [],
+                schema: {
+                    model: gptData.model || "gpt-4o-mini"
+                }
+            };
+            
+            const response = await fetch(`${backendUrl}/gpt-opened`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log("GPT opened notification successful");
+                
+                // Store the collection name if provided
+                if (data && data.collection_name) {
+                    setCollectionName(data.collection_name);
+                }
+                
+                return true;
+            } else {
+                console.error("Failed to notify GPT opened:", await response.text());
+                return false;
+            }
+        } catch (err) {
+            console.error("Error notifying GPT opened:", err);
+            return false;
+        }
+    };
 
     return (
         <div className={`flex flex-col h-screen overflow-hidden transition-colors duration-300 ${

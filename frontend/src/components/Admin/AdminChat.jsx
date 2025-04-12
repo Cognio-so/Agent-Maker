@@ -511,7 +511,19 @@ const AdminChat = () => {
                 }
                 
                 const text = decoder.decode(value, {stream: true});
-                console.log("Raw streaming data:", text); // For debugging
+                console.log("Raw streaming data:", text);
+                
+                const trimmedText = text.trim();
+                if (trimmedText) {
+                    try {
+                        // Try to parse it as full JSON for better debugging
+                        const parsed = JSON.parse(trimmedText);
+                        console.log("Full parsed stream chunk:", parsed);
+                    } catch {
+                        // If not valid JSON, just log the raw text
+                        console.log("Raw stream chunk text:", trimmedText.substring(0, 100) + (trimmedText.length > 100 ? "..." : ""));
+                    }
+                }
                 
                 const lines = text.split('\n').filter(line => line.trim());
                 

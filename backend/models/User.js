@@ -28,7 +28,11 @@ const userSchema = new Schema({
     lastActive: {
         type: Date,
         default: null
-    }
+    },
+    assignedGpts: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'CustomGpt'
+    }]
 }, {timestamps:true});
     
 const User = mongoose.model('User', userSchema);

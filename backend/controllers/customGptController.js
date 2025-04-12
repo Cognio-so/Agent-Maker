@@ -439,36 +439,79 @@ const getAllCustomGpts = async (req, res) => {
 
 const getUserAssignedGpts = async (req, res) => {
   try {
-    const userId = req.params.userId || req.user._id;
-
-    const assignments = await UserGptAssignment.find({ userId })
-      .populate({
-        path: 'gptId',
-        select: 'name description imageUrl model capabilities knowledgeFiles'
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required"
       });
+    }
 
-    // Format response to match frontend expectations
-    const gpts = assignments.map(assignment => ({
-      _id: assignment.gptId._id,
-      id: assignment.gptId._id, // Add both id formats for compatibility
-      name: assignment.gptId.name,
-      description: assignment.gptId.description,
-      imageUrl: assignment.gptId.imageUrl,
-      model: assignment.gptId.model,
-      capabilities: assignment.gptId.capabilities,
-      knowledgeFiles: assignment.gptId.knowledgeFiles,
-      assignedAt: assignment.createdAt
-    }));
-
+    const userId = req.user._id;
+    
+    // Option 1: Set strictPopulate to false (quick fix)
+    const user = await User.findById(userId)
+      .populate({ path: 'assignedGpts', strictPopulate: false })
+      .exec();
+    
+    // OR Option 2: Check if the field exists first (more robust)
+    // const user = await User.findById(userId);
+    // if (!user) {
+    //   return res.status(404).json({ success: false, message: "User not found" });
+    // }
+    
+    // if (!user.assignedGpts || !Array.isArray(user.assignedGpts)) {
+    //   return res.status(200).json({
+    //     success: true,
+    //     gpts: []
+    //   });
+    // }
+    
+    // user.populate({ path: 'assignedGpts', strictPopulate: false });
+    
+    // Check if user exists
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+    
+    // Safely handle potentially undefined assignedGpts
+    const gpts = ((user.assignedGpts || [])
+      .filter(gpt => gpt !== null && gpt !== undefined)
+      .map(gpt => {
+        if (!gpt || !gpt._id) {
+          return null;
+        }
+        
+        return {
+          _id: gpt._id,
+          name: gpt.name || "Unnamed GPT",
+          description: gpt.description || "",
+          model: gpt.model || "gpt-4o-mini",
+          imageUrl: gpt.imageUrl || null,
+          files: gpt.files || [],
+          capabilities: gpt.capabilities || {},
+          assignedAt: gpt.assignedAt || new Date()
+        };
+      })
+      .filter(Boolean)); // Remove null entries
+      
     return res.status(200).json({
       success: true,
-      gpts // Change key name to match frontend expectations
+      gpts: gpts || []
     });
   } catch (error) {
-    console.error('Error fetching user assigned GPTs:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Error fetching assigned GPTs'
+    console.error("Error fetching user assigned GPTs:", error);
+    
+    // Return a more specific error message in development
+    const errorMessage = process.env.NODE_ENV === 'development' 
+      ? error.message || "Failed to fetch assigned GPTs"
+      : "Failed to fetch assigned GPTs";
+      
+    return res.status(500).json({ 
+      success: false, 
+      message: errorMessage
     });
   }
 };

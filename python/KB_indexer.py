@@ -635,18 +635,42 @@ Be direct and specific about whether they are a good fit for the position.
         # Streaming response
         async def streaming_response():
             async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"https://api.{model_provider}.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
+                # Configure API endpoint and payload based on provider
+                if model_provider == "openai":
+                    api_url = "https://api.openai.com/v1/chat/completions"
+                    payload = {
                         "model": model,
                         "messages": messages,
                         "stream": True
                     }
-                ) as response:
+                    headers = {
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
+                    }
+                else:
+                    # Default to OpenAI API for all other providers for now
+                    api_url = "https://api.openai.com/v1/chat/completions"
+                    fallback_model = "gpt-4o-mini"  # Use a reliable fallback model
+                    logger.info(f"Using OpenAI fallback model {fallback_model} instead of {model_provider}")
+                    
+                    payload = {
+                        "model": fallback_model,
+                        "messages": messages,
+                        "stream": True
+                    }
+                    headers = {
+                        "Authorization": f"Bearer {openai_api_key}",
+                        "Content-Type": "application/json"
+                    }
+                    
+                async with session.post(api_url, headers=headers, json=payload) as response:
+                    if not response.ok:
+                        error_msg = f"API error: {response.status} - {await response.text()}"
+                        logger.error(error_msg)
+                        yield f"data: {json.dumps({'error': error_msg})}\n\n"
+                        yield f"data: {json.dumps({'done': True})}\n\n"
+                        return
+                        
                     async for line in response.content:
                         if line.startswith(b"data: "):
                             line = line[6:]
@@ -662,7 +686,6 @@ Be direct and specific about whether they are a good fit for the position.
                                         yield f"data: {json.dumps({'content': content})}\n\n"
                             except json.JSONDecodeError:
                                 logger.error(f"Error decoding JSON: {line}")
-                                
         return StreamingResponse(streaming_response(), media_type="text/event-stream")
     except Exception as e:
         logger.error(f"Error in perform_rag_query_stream: {e}", exc_info=True)
