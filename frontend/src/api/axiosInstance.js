@@ -8,17 +8,37 @@ const axiosInstance = axios.create({
     timeout: 30000 // 30 seconds timeout
 });
 
+// Token management functions
+const setAccessToken = (token) => {
+    if (token) {
+        localStorage.setItem('token', token);
+        // Also update the default headers for future requests
+        axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+        // Clear token if null/undefined is passed
+        removeAccessToken();
+    }
+};
+
+const getAccessToken = () => {
+    // Prefer localStorage, fallback to sessionStorage
+    return localStorage.getItem('token') || sessionStorage.getItem('token') || null;
+};
+
+const removeAccessToken = () => {
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
+    // Also remove from default headers
+    delete axiosInstance.defaults.headers.common['Authorization'];
+};
+
 // Add request interceptor to attach token to every request
 axiosInstance.interceptors.request.use(
     (config) => {
-        // Get the token from localStorage or sessionStorage
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        
+        const token = getAccessToken();
         if (token) {
-            // Add token to headers if it exists
             config.headers['Authorization'] = `Bearer ${token}`;
         }
-        
         return config;
     },
     (error) => {
@@ -34,15 +54,20 @@ axiosInstance.interceptors.response.use(
     (error) => {
         // Handle authentication errors
         if (error.response && error.response.status === 401) {
-            // Option 1: Redirect to login page
-            // window.location.href = '/login';
-            
-            // Option 2: Just log the error and let component handle it
-            console.error('Authentication error: Please log in again');
+            console.error('Authentication error detected by interceptor');
+            // Optional: Clear token and redirect to login upon 401
+            // removeAccessToken(); 
+            // window.location.href = '/login'; 
         }
         
         return Promise.reject(error);
     }
 );
 
-export { axiosInstance }; 
+// Export all the necessary functions
+export { 
+    axiosInstance, 
+    setAccessToken, 
+    getAccessToken, 
+    removeAccessToken 
+}; 
