@@ -174,12 +174,6 @@ const UserDashboard = () => {
                     </motion.div>
                 ))}
             </div>
-
-            {/* Chat Input Component - Pass isDarkMode prop */}
-            <div className="mt-6 sm:mt-8 w-full max-w-xs sm:max-w-xl md:max-w-2xl lg:max-w-3xl px-2 sm:px-4">
-                <ChatInput onSubmit={handleChatSubmit} isDarkMode={isDarkMode} />
-            </div>
-            
             {/* Close profile dropdown when clicking outside */}
             {isProfileOpen && (
                 <div 

@@ -3,9 +3,10 @@ import { IoSendSharp } from 'react-icons/io5';
 import { HiMiniPaperClip } from 'react-icons/hi2';
 import { FiGlobe } from 'react-icons/fi';
 
-const ChatInput = ({ onSubmit, isLoading, isDarkMode, showWebSearch }) => {
+const ChatInput = ({ onSubmit, onFileUpload, isLoading, isDarkMode, showWebSearch }) => {
     const [inputMessage, setInputMessage] = useState('');
     const textareaRef = useRef(null);
+    const fileInputRef = useRef(null);
 
     // More robust auto-resize textarea
     const resizeTextarea = () => {
@@ -48,6 +49,22 @@ const ChatInput = ({ onSubmit, isLoading, isDarkMode, showWebSearch }) => {
         }
     };
 
+    // Function to handle click on the paperclip icon
+    const handleUploadClick = () => {
+        fileInputRef.current.click(); // Trigger click on the hidden file input
+    };
+
+    // Function to handle file selection
+    const handleFileChange = (e) => {
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            if (onFileUpload) {
+                onFileUpload(files);
+            }
+            e.target.value = null;
+        }
+    };
+
     return (
         <div className="w-full">
             <form onSubmit={handleSubmit}>
@@ -78,6 +95,14 @@ const ChatInput = ({ onSubmit, isLoading, isDarkMode, showWebSearch }) => {
                         
                         <div className="flex justify-between items-center mt-1 sm:mt-2">
                             <div className="flex items-center gap-1">
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileChange}
+                                    style={{ display: 'none' }}
+                                    multiple
+                                    disabled={isLoading}
+                                />
                                 {showWebSearch && (
                                     <div 
                                         className={`rounded-full w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center ${
@@ -90,6 +115,7 @@ const ChatInput = ({ onSubmit, isLoading, isDarkMode, showWebSearch }) => {
                                 )}
                                 <button 
                                     type="button" 
+                                    onClick={handleUploadClick}
                                     className={`rounded-full w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center transition-colors ${
                                         isDarkMode 
                                             ? 'text-gray-400 hover:bg-gray-700/50' 
@@ -110,7 +136,11 @@ const ChatInput = ({ onSubmit, isLoading, isDarkMode, showWebSearch }) => {
                                 } disabled:opacity-50 disabled:cursor-not-allowed`}
                                 disabled={!inputMessage.trim() || isLoading}
                             >
-                                <IoSendSharp size={16} className="sm:text-[18px]" />
+                                {isLoading ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                                ) : (
+                                    <IoSendSharp size={16} className="sm:text-[18px]" />
+                                )}
                             </button>
                         </div>
                     </div>
