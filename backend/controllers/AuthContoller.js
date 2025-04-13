@@ -470,4 +470,94 @@ const getUserGptCount = async (req, res) => {
     }
 };
 
-module.exports = { Signup, Login, Logout, googleAuth, googleAuthCallback, refreshTokenController, getCurrentUser, getAllUsers, inviteTeamMember, getPendingInvitesCount, setInactive, removeTeamMember, getUsersWithGptCounts, getUserGptCount };
+// Get user activity
+const getUserActivity = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        
+        // Only admin should be able to access other users' activity
+        if (req.user.role !== 'admin' && req.user._id.toString() !== userId) {
+            return res.status(403).json({ message: 'Not authorized to access this resource' });
+        }
+        
+        // For now, return empty array - you can implement actual activity tracking later
+        return res.status(200).json({
+            success: true,
+            activities: []
+        });
+    } catch (error) {
+        console.error('Error fetching user activity:', error);
+        return res.status(500).json({ message: error.message });
+    }
+};
+
+// Get user notes
+const getUserNotes = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        
+        // Only admin should be able to access other users' notes
+        if (req.user.role !== 'admin' && req.user._id.toString() !== userId) {
+            return res.status(403).json({ message: 'Not authorized to access this resource' });
+        }
+        
+        // For now, return empty array - you can implement notes functionality later
+        return res.status(200).json({
+            success: true,
+            notes: []
+        });
+    } catch (error) {
+        console.error('Error fetching user notes:', error);
+        return res.status(500).json({ message: error.message });
+    }
+};
+
+// Add user note
+const addUserNote = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { text } = req.body;
+        
+        // Only admin should be able to add notes to users
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Not authorized to access this resource' });
+        }
+        
+        // For now, return a mock note - you can implement actual note adding later
+        return res.status(200).json({
+            success: true,
+            note: {
+                id: Date.now().toString(),
+                text,
+                createdBy: req.user.name,
+                createdAt: new Date()
+            }
+        });
+    } catch (error) {
+        console.error('Error adding user note:', error);
+        return res.status(500).json({ message: error.message });
+    }
+};
+
+// Delete user note
+const deleteUserNote = async (req, res) => {
+    try {
+        const { userId, noteId } = req.params;
+        
+        // Only admin should be able to delete notes
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Not authorized to access this resource' });
+        }
+        
+        // For now, just return success - you can implement actual note deletion later
+        return res.status(200).json({
+            success: true,
+            message: 'Note deleted successfully'
+        });
+    } catch (error) {
+        console.error('Error deleting user note:', error);
+        return res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { Signup, Login, Logout, googleAuth, googleAuthCallback, refreshTokenController, getCurrentUser, getAllUsers, inviteTeamMember, getPendingInvitesCount, setInactive, removeTeamMember, getUsersWithGptCounts, getUserGptCount, getUserActivity, getUserNotes, addUserNote, deleteUserNote };

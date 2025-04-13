@@ -14,7 +14,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { FaFilePdf, FaFileWord, FaFileAlt, FaFile } from 'react-icons/fa';
 
-const backendUrl = "http://localhost:8000"; // Change if your backend is on a different URL
+const PYTHON_URL = import.meta.env.VITE_PYTHON_API_URL;
 
 const MarkdownStyles = () => (
     <style dangerouslySetInnerHTML={{__html: `
@@ -122,7 +122,7 @@ const AdminChat = () => {
             const fileUrls = gptData.knowledgeFiles?.map(file => file.fileUrl) || [];
             
             const response = await axios.post(
-                `${backendUrl}/gpt-opened`,
+                `${PYTHON_URL}/gpt-opened`,
                 {
                     user_email: userData.email,
                     gpt_name: gptData.name,
@@ -276,7 +276,7 @@ const AdminChat = () => {
             // Try streaming first
             try {
                 console.log("Attempting streaming response...");
-                const response = await fetch(`${backendUrl}/chat-stream`, {
+                const response = await fetch(`${PYTHON_URL}/chat-stream`, {
                     method: "POST",
                     headers: {
                         'Content-Type': 'application/json',
@@ -296,7 +296,7 @@ const AdminChat = () => {
                 
                 // Fallback to regular chat API
                 const fallbackResponse = await axios.post(
-                    `${backendUrl}/chat`, 
+                    `${PYTHON_URL}/chat`, 
                     payload,
                     {
                         headers: {
@@ -400,7 +400,7 @@ const AdminChat = () => {
             
             // Upload files to backend
             const response = await axios.post(
-                `${backendUrl}/upload-chat-files`,
+                `${PYTHON_URL}/upload-chat-files`,
                 formData,
                 {
                     headers: {
@@ -471,7 +471,7 @@ const AdminChat = () => {
         const checkBackendAvailability = async () => {
             try {
                 // Change from HEAD request to / to a known endpoint that exists
-                await axios.get(`${backendUrl}/gpt-collection-info/test/test`);
+                await axios.get(`${PYTHON_URL}/gpt-collection-info/test/test`);
                 setBackendAvailable(true);
             } catch (error) {
                 // Even if the endpoint returns 404/400, the server is still running

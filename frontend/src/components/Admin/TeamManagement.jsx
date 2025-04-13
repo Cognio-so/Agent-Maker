@@ -610,14 +610,14 @@ const TeamManagement = () => {
                 />
             )}
             {showInviteModal && (
-            <InviteTeamMemberModal
-                isOpen={showInviteModal}
-                onClose={() => setShowInviteModal(false)}
+                <InviteTeamMemberModal
+                    isOpen={showInviteModal}
+                    onClose={() => setShowInviteModal(false)}
                     onInviteSent={() => {
-                        fetchTeamData();
                         setPendingInvitesCount(prev => prev + 1);
+                        toast.success("Invitation sent successfully");
                     }}
-            />
+                />
             )}
             {showEditPermissionsModal && selectedMemberForPermissions && (
                 <EditPermissionsModal

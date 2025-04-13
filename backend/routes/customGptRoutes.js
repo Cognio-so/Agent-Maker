@@ -27,6 +27,10 @@ router.get('/', getAllCustomGpts);
 // User-specific GPTs
 router.get('/user', getUserCustomGpts);
 
+// User assigned GPTs (MOVED BEFORE the /:id routes)
+router.get('/user/assigned', getUserAssignedGpts);
+router.get('/user/assigned/:id', getAssignedGptById);
+
 // Team routes (need to come before /:id routes)
 router.get('/team/gpt-counts', getUserGptCount);
 router.get('/team/members/:userId/gpts', getUserAssignedGpts);
@@ -42,11 +46,5 @@ router.put('/:id', uploadMiddleware, updateCustomGpt);
 router.delete('/:id', deleteCustomGpt);
 router.delete('/:id/knowledge/:fileIndex', deleteKnowledgeFile);
 router.patch('/:id/folder', updateGptFolder);
-
-// Get assigned GPT by ID for the current user
-router.get('/user/assigned/:id', protectRoute, getAssignedGptById);
-
-// User assigned GPTs (for regular users to see their collections)
-router.get('/user/assigned', protectRoute, getUserAssignedGpts);
 
 module.exports = router; 

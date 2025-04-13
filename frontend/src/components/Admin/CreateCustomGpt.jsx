@@ -12,6 +12,7 @@ import { axiosInstance } from '../../api/axiosInstance';
 import { useTheme } from '../../context/ThemeContext'; // Import useTheme
 import axios from 'axios';
 
+const PYTHON_URL = import.meta.env.VITE_PYTHON_API_URL;
 
 const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
     const navigate = useNavigate();
@@ -207,7 +208,7 @@ const CreateCustomGpt = ({ onGoBack, editGptId = null, onGptCreated }) => {
     const triggerKnowledgeIndexing = async (gptId, fileUrls, email) => {
         try {
             const response = await axios.post(
-                `${process.env.REACT_APP_PYTHON_API_URL || "http://localhost:8000"}/index-knowledge`,
+                    `${PYTHON_URL}/index-knowledge`,
                 {
                     file_urls: fileUrls,
                     user_email: email || "user@example.com",

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Signup, Login, Logout, googleAuth, googleAuthCallback, refreshTokenController, getCurrentUser, getAllUsers, inviteTeamMember, getPendingInvitesCount, setInactive, removeTeamMember, getUsersWithGptCounts, getUserGptCount } = require('../controllers/AuthContoller');
+const { Signup, Login, Logout, googleAuth, googleAuthCallback, refreshTokenController, getCurrentUser, getAllUsers, inviteTeamMember, getPendingInvitesCount, setInactive, removeTeamMember, getUsersWithGptCounts, getUserGptCount, getUserActivity, getUserNotes, addUserNote, deleteUserNote } = require('../controllers/AuthContoller');
 const passport = require('passport');
 const { protectRoute } = require('../middleware/authMiddleware'); // Imports protectRoute
 
@@ -32,5 +32,10 @@ router.delete('/users/:userId', protectRoute, removeTeamMember);
 
 router.get('/users/with-gpt-counts', protectRoute, getUsersWithGptCounts);
 router.get('/users/:userId/gpt-count', protectRoute, getUserGptCount);
+
+router.get('/users/:userId/activity', protectRoute, getUserActivity);
+router.get('/users/:userId/notes', protectRoute, getUserNotes);
+router.post('/users/:userId/notes', protectRoute, addUserNote);
+router.delete('/users/:userId/notes/:noteId', protectRoute, deleteUserNote);
 
 module.exports = router;

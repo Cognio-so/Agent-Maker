@@ -37,10 +37,21 @@ gpt_model_cache = {}  # Maps collection_name to model
 # Store API keys for different models
 MODEL_API_KEYS = {
     "gpt-4": os.environ.get("OPENAI_API_KEY"),
+    "gpt-4o-mini": os.environ.get("OPENAI_API_KEY"),
     "gpt-3.5": os.environ.get("OPENAI_API_KEY"),
     "claude": os.environ.get("ANTHROPIC_API_KEY"),
     "gemini": os.environ.get("GOOGLE_API_KEY"),
     "llama": os.environ.get("META_API_KEY")
+}
+
+# Add a model translation dictionary near the top of main.py
+MODEL_TRANSLATIONS = {
+    "gpt-4": "gpt-4o",          # Latest GPT-4 model
+    "gpt-4o-mini": "gpt-4o-mini", # Latest GPT-4 model
+    "gpt-3.5": "gpt-3.5-turbo", # Correct model name for API
+    "claude": "claude-3-opus-20240229",  # Latest Claude model
+    "gemini": "gemini-pro",     # Google's Gemini model
+    "llama": "llama-3-70b-chat" # Meta's Llama model
 }
 
 class IndexRequest(BaseModel):
@@ -96,11 +107,15 @@ async def gpt_opened(request: GPTOpenRequest):
         collection_name = collection_name[:63]  # Limit length
         
         # Extract and store model from schema with better logging
-        model = "gpt-4o-mini"  # Default model
+        frontend_model = "gpt-4o-mini"  # Default model
         if request.schema and 'model' in request.schema:
-            model = request.schema['model']
-            gpt_model_cache[collection_name] = model
-            print(f"✅ CustomGPT using model: {model} for collection: {collection_name}")
+            frontend_model = request.schema['model']
+            gpt_model_cache[collection_name] = frontend_model
+            
+            # Translate to actual API model name
+            model = MODEL_TRANSLATIONS.get(frontend_model, frontend_model)
+            
+            print(f"✅ CustomGPT using model: {frontend_model} (API: {model}) for collection: {collection_name}")
             
             # Check if we have the API key for this model
             if model in MODEL_API_KEYS and MODEL_API_KEYS[model]:
@@ -189,29 +204,33 @@ async def chat(request: ChatRequest):
         user_collection_name = f"{collection_name}_user_docs" if user_documents else None
         
         # Get the model from cache or use a default
-        model = gpt_model_cache.get(collection_name, "gpt-4o-mini")
-        print(f"🤖 Using model {model} for chat with collection {collection_name}")
+        frontend_model = gpt_model_cache.get(collection_name, "gpt-4o-mini")
+        
+        # Translate frontend model name to actual API model name
+        model = MODEL_TRANSLATIONS.get(frontend_model, frontend_model)
+        
+        print(f"🤖 Using model {frontend_model} (API: {model}) for chat with collection {collection_name}")
         
         # Get configuration from environment
         qdrant_url = os.environ.get("QDRANT_URL")
         qdrant_api_key = os.environ.get("QDRANT_API_KEY")
         
         # Get the appropriate API key based on model
-        if model.startswith("gpt-"):
+        if frontend_model.startswith("gpt-"):
             openai_api_key = MODEL_API_KEYS.get("gpt-4", os.environ.get("OPENAI_API_KEY"))
-        elif model == "claude":
+        elif frontend_model == "claude":
             openai_api_key = MODEL_API_KEYS.get("claude", os.environ.get("ANTHROPIC_API_KEY"))
-        elif model == "gemini":
+        elif frontend_model == "gemini":
             openai_api_key = MODEL_API_KEYS.get("gemini", os.environ.get("GOOGLE_API_KEY"))
-        elif model == "llama":
+        elif frontend_model == "llama":
             openai_api_key = MODEL_API_KEYS.get("llama", os.environ.get("META_API_KEY"))
         else:
             openai_api_key = os.environ.get("OPENAI_API_KEY")
             
         # Check if we have the API key
         if not openai_api_key:
-            print(f"⚠️ No API key found for model: {model}")
-            return {"success": False, "response": f"No API key configured for model: {model}"}
+            print(f"⚠️ No API key found for model: {frontend_model}")
+            return {"success": False, "response": f"No API key configured for model: {frontend_model}"}
         
         # Format history for KB_indexer
         formatted_history = [
@@ -281,14 +300,18 @@ async def chat_stream(request: ChatRequest):
         collection_name = request.collection_name
         user_documents = request.user_documents or []
         history = request.history or []
-        memory = request.memory or []  # Add memory extraction
+        memory = request.memory or []
         
         # Define user documents collection if present
         user_collection_name = f"{collection_name}_user_docs" if user_documents else None
         
         # Get the model from cache or use a default
-        model = gpt_model_cache.get(collection_name, "gpt-4o-mini")
-        print(f"Using model {model} for streaming chat with collection {collection_name}")
+        frontend_model = gpt_model_cache.get(collection_name, "gpt-4o-mini")
+        
+        # Translate frontend model name to actual API model name
+        model = MODEL_TRANSLATIONS.get(frontend_model, frontend_model)
+        
+        print(f"Using model {frontend_model} (API: {model}) for streaming chat with collection {collection_name}")
         
         # Get configuration from environment
         qdrant_url = os.environ.get("QDRANT_URL")

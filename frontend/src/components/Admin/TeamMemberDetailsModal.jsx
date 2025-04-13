@@ -190,6 +190,7 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
 
     // Add this function to handle assigning GPTs
     const handleAssignGpts = () => {
+        console.log("Assign GPTs button clicked. Member:", member);
         setShowAssignGptsModal(true);
     };
 
@@ -491,86 +492,91 @@ const TeamMemberDetailsModal = ({ isOpen, onClose, member }) => {
     );
 
     return (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'} transition-opacity duration-300`}>
-            <div className="absolute inset-0 bg-black/60 dark:bg-black/80" onClick={onClose}></div>
-            
-            <div className={`relative bg-white dark:bg-gray-800 w-full max-w-3xl max-h-[90vh] rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col transform ${isOpen ? 'scale-100' : 'scale-95'} transition-transform duration-300`}>
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900 flex-shrink-0">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate pr-4">
-                        Member Details: {member?.name}
-                    </h3>
-                    <button 
-                        onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-white transition-colors rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700 flex-shrink-0"
-                    >
-                        <IoClose size={22} />
-                    </button>
-                </div>
+        <>
+            <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'} transition-opacity duration-300`}>
+                <div className="absolute inset-0 bg-black/60 dark:bg-black/80" onClick={onClose}></div>
+                
+                <div className={`relative bg-white dark:bg-gray-800 w-full max-w-3xl max-h-[90vh] rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col transform ${isOpen ? 'scale-100' : 'scale-95'} transition-transform duration-300`}>
+                    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900 flex-shrink-0">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate pr-4">
+                            Member Details: {member?.name}
+                        </h3>
+                        <button 
+                            onClick={onClose}
+                            className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-white transition-colors rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700 flex-shrink-0"
+                        >
+                            <IoClose size={22} />
+                        </button>
+                    </div>
 
-                <div className="px-6 pt-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 bg-white dark:bg-gray-800">
-                    <div className="flex gap-1 -mb-px">
-                        {[
-                            { id: 'profile', label: 'Profile', icon: IoPersonCircleOutline },
-                            { id: 'gpts', label: 'Assigned GPTs', icon: IoAppsOutline },
-                            { id: 'activity', label: 'Activity', icon: FiActivity },
-                            { id: 'notes', label: 'Notes', icon: IoBriefcaseOutline },
-                        ].map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`px-4 py-2.5 border-b-2 text-sm font-medium transition-colors duration-200 flex items-center gap-2 whitespace-nowrap ${
-                                    activeTab === tab.id
-                                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white hover:border-gray-300 dark:hover:border-gray-600'
-                                }`}
-                            >
-                                <tab.icon size={16} /> {tab.label}
-                            </button>
-                        ))}
+                    <div className="px-6 pt-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 bg-white dark:bg-gray-800">
+                        <div className="flex gap-1 -mb-px">
+                            {[
+                                { id: 'profile', label: 'Profile', icon: IoPersonCircleOutline },
+                                { id: 'gpts', label: 'Assigned GPTs', icon: IoAppsOutline },
+                                { id: 'activity', label: 'Activity', icon: FiActivity },
+                                { id: 'notes', label: 'Notes', icon: IoBriefcaseOutline },
+                            ].map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`px-4 py-2.5 border-b-2 text-sm font-medium transition-colors duration-200 flex items-center gap-2 whitespace-nowrap ${
+                                        activeTab === tab.id
+                                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white hover:border-gray-300 dark:hover:border-gray-600'
+                                    }`}
+                                >
+                                    <tab.icon size={16} /> {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-800/50 custom-scrollbar-dark dark:custom-scrollbar">
+                        {activeTab === 'profile' && renderProfileTab()}
+                        {activeTab === 'gpts' && renderAssignedGptsTab()}
+                        {activeTab === 'activity' && renderActivityTab()}
+                        {activeTab === 'notes' && renderNotesTab()}
                     </div>
                 </div>
-                
-                <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-800/50 custom-scrollbar-dark dark:custom-scrollbar">
-                    {activeTab === 'profile' && renderProfileTab()}
-                    {activeTab === 'gpts' && renderAssignedGptsTab()}
-                    {activeTab === 'activity' && renderActivityTab()}
-                    {activeTab === 'notes' && renderNotesTab()}
-                </div>
             </div>
-
-            {showAssignGptsModal && (
-                <AssignGptsModal 
-                    isOpen={showAssignGptsModal}
-                    onClose={() => {
-                        setShowAssignGptsModal(false);
-                        // Refresh the GPTs list after assignment
-                        if (member) {
-                            const fetchAssignedGpts = async () => {
-                                setLoading(prev => ({ ...prev, gpts: true }));
-                                try {
-                                    const response = await axiosInstance.get(`/api/custom-gpts/team/members/${member.id}/gpts`, {
-                                        withCredentials: true
-                                    });
-                                    
-                                    if (response.data && response.data.gpts) {
-                                        setMemberGpts(response.data.gpts);
+            
+            {showAssignGptsModal && member && (
+                <div className="fixed inset-0 z-[60]">
+                    <AssignGptsModal 
+                        isOpen={showAssignGptsModal}
+                        onClose={() => {
+                            console.log("Closing AssignGptsModal");
+                            setShowAssignGptsModal(false);
+                            // Refresh the GPTs list after assignment
+                            if (member) {
+                                const fetchAssignedGpts = async () => {
+                                    setLoading(prev => ({ ...prev, gpts: true }));
+                                    try {
+                                        const response = await axiosInstance.get(`/api/custom-gpts/team/members/${member.id}/gpts`, {
+                                            withCredentials: true
+                                        });
+                                        
+                                        if (response.data && response.data.gpts) {
+                                            setMemberGpts(response.data.gpts);
+                                        }
+                                    } catch (error) {
+                                        console.error("Error fetching assigned GPTs:", error);
+                                        toast.error("Could not load assigned GPTs");
+                                    } finally {
+                                        setLoading(prev => ({ ...prev, gpts: false }));
                                     }
-                                } catch (error) {
-                                    console.error("Error fetching assigned GPTs:", error);
-                                    toast.error("Could not load assigned GPTs");
-                                } finally {
-                                    setLoading(prev => ({ ...prev, gpts: false }));
-                                }
-                            };
-                            
-                            fetchAssignedGpts();
-                        }
-                    }}
-                    teamMember={member}
-                    onAssignmentChange={handleGptAssignmentChange}
-                />
+                                };
+                                
+                                fetchAssignedGpts();
+                            }
+                        }}
+                        teamMember={member}
+                        onAssignmentChange={handleGptAssignmentChange}
+                    />
+                </div>
             )}
-        </div>
+        </>
     );
 };
 

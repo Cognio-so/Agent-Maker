@@ -439,79 +439,48 @@ const getAllCustomGpts = async (req, res) => {
 
 const getUserAssignedGpts = async (req, res) => {
   try {
-    if (!req.user || !req.user._id) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required"
-      });
-    }
-
-    const userId = req.user._id;
+    const userId = req.params.userId || req.user._id;  // Allow using either parameter or current user
     
-    // Option 1: Set strictPopulate to false (quick fix)
-    const user = await User.findById(userId)
-      .populate({ path: 'assignedGpts', strictPopulate: false })
-      .exec();
+    console.log(`Fetching GPTs for user: ${userId}`);
     
-    // OR Option 2: Check if the field exists first (more robust)
-    // const user = await User.findById(userId);
-    // if (!user) {
-    //   return res.status(404).json({ success: false, message: "User not found" });
-    // }
+    // Check for assignments in UserGptAssignment collection
+    const assignments = await UserGptAssignment.find({ userId }).lean();
+    console.log(`Found ${assignments.length} assignments`);
     
-    // if (!user.assignedGpts || !Array.isArray(user.assignedGpts)) {
-    //   return res.status(200).json({
-    //     success: true,
-    //     gpts: []
-    //   });
-    // }
-    
-    // user.populate({ path: 'assignedGpts', strictPopulate: false });
-    
-    // Check if user exists
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found"
+    if (assignments.length === 0) {
+      console.log('No GPT assignments found for this user');
+      return res.status(200).json({
+        success: true,
+        gpts: []
       });
     }
     
-    // Safely handle potentially undefined assignedGpts
-    const gpts = ((user.assignedGpts || [])
-      .filter(gpt => gpt !== null && gpt !== undefined)
-      .map(gpt => {
-        if (!gpt || !gpt._id) {
-          return null;
-        }
-        
-        return {
-          _id: gpt._id,
-          name: gpt.name || "Unnamed GPT",
-          description: gpt.description || "",
-          model: gpt.model || "gpt-4o-mini",
-          imageUrl: gpt.imageUrl || null,
-          files: gpt.files || [],
-          capabilities: gpt.capabilities || {},
-          assignedAt: gpt.assignedAt || new Date()
-        };
-      })
-      .filter(Boolean)); // Remove null entries
-      
+    // Get GPT details for each assignment
+    const gptIds = assignments.map(assignment => assignment.gptId);
+    console.log(`Looking up GPTs with IDs: ${gptIds.join(', ')}`);
+    
+    const gpts = await CustomGpt.find({ _id: { $in: gptIds } }).lean();
+    console.log(`Found ${gpts.length} GPTs from ${gptIds.length} assignments`);
+    
+    // Add assignment dates to each GPT
+    const gptsWithDates = gpts.map(gpt => {
+      const assignment = assignments.find(a => a.gptId.toString() === gpt._id.toString());
+      return {
+        ...gpt,
+        assignedAt: assignment?.createdAt || new Date()
+      };
+    });
+    
     return res.status(200).json({
       success: true,
-      gpts: gpts || []
+      gpts: gptsWithDates
     });
   } catch (error) {
-    console.error("Error fetching user assigned GPTs:", error);
-    
-    // Return a more specific error message in development
-    const errorMessage = process.env.NODE_ENV === 'development' 
-      ? error.message || "Failed to fetch assigned GPTs"
-      : "Failed to fetch assigned GPTs";
-      
+    console.error(`Error in getUserAssignedGpts: ${error.message}`);
+    console.error(error.stack);
     return res.status(500).json({ 
       success: false, 
-      message: errorMessage
+      message: `Failed to fetch assigned GPTs: ${error.message}`
     });
   }
 };
@@ -544,6 +513,15 @@ const assignGptToUser = async (req, res) => {
       });
     }
 
+    // Check if assignment already exists
+    const existingAssignment = await UserGptAssignment.findOne({ userId, gptId });
+    if (existingAssignment) {
+      return res.status(200).json({
+        success: true,
+        message: 'GPT is already assigned to this user'
+      });
+    }
+
     await UserGptAssignment.create({
       userId,
       gptId,
@@ -555,14 +533,6 @@ const assignGptToUser = async (req, res) => {
       message: 'GPT assigned successfully'
     });
   } catch (error) {
-    // Handle duplicate key error (GPT already assigned)
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: 'GPT is already assigned to this user'
-      });
-    }
-
     console.error('Error assigning GPT:', error);
     return res.status(500).json({
       success: false,
