@@ -76,8 +76,8 @@ axiosInstance.interceptors.response.use(
         const originalRequest = error.config;
         
         // Don't retry if we already tried or it's a refresh token request
-        if (error.response?.status === 401 && !originalRequest._retry && 
-            !originalRequest.url.includes('/api/auth/refresh-token')) {
+        if (error.response?.status === 401 && !originalRequest._retry &&
+            !originalRequest.url.includes('/api/auth/refresh')) {
             
             if (isRefreshing) {
                 // If refresh is in progress, queue this request
@@ -96,7 +96,7 @@ axiosInstance.interceptors.response.use(
             
             try {
                 // Use the correct refresh endpoint from AuthContext
-                const response = await axios.post(`${baseURL}/api/auth/refresh-token`, {}, 
+                const response = await axios.post(`${baseURL}/api/auth/refresh`, {}, 
                     { withCredentials: true });
                 
                 if (response.data && response.data.accessToken) {
@@ -110,12 +110,16 @@ axiosInstance.interceptors.response.use(
                     originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
                     return axios(originalRequest);
                 } else {
-                    processQueue(new Error('Failed to refresh token'));
+                    // Handle cases where refresh might succeed but not return a token
+                    const refreshError = new Error('Failed to refresh token: No new token received');
+                    processQueue(refreshError);
                     removeAccessToken();
                     // Don't redirect here - let the auth context handle that
-                    return Promise.reject(error);
+                    return Promise.reject(refreshError); // Reject with specific error
                 }
             } catch (refreshError) {
+                // Log the actual refresh error for better debugging
+                console.error("Token refresh failed:", refreshError.response?.data || refreshError.message);
                 processQueue(refreshError);
                 removeAccessToken();
                 // Don't redirect here - let the auth context handle that
@@ -125,6 +129,7 @@ axiosInstance.interceptors.response.use(
             }
         }
         
+        // For non-401 errors or retried requests, just reject
         return Promise.reject(error);
     }
 );

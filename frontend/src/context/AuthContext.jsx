@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }) => {
       if (savedUser) {
         try {
           setUser(JSON.parse(savedUser));
-          const response = await axiosInstance.post('/api/auth/refresh-token');
+          const response = await axiosInstance.post('/api/auth/refresh');
           if (response.data && response.data.accessToken) {
             updateAccessToken(response.data.accessToken);
           }
