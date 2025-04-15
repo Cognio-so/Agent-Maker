@@ -132,7 +132,7 @@ const ChatInput = ({ onSubmit, onFileUpload, isLoading, isDarkMode, showWebSearc
                                 className={`rounded-full w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center transition-colors ${
                                     isDarkMode 
                                         ? 'bg-gray-700 hover:bg-gray-600 text-white' 
-                                        : 'bg-blue-500 hover:bg-blue-600 text-white'
+                                        : 'bg-gray-700 hover:bg-gray-600 text-white'
                                 } disabled:opacity-50 disabled:cursor-not-allowed`}
                                 disabled={!inputMessage.trim() || isLoading}
                             >

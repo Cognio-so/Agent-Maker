@@ -729,10 +729,10 @@ const AdminChat = () => {
                                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                 >
                                     <div 
-                                        className={`w-full max-w-[95%] rounded-2xl px-5 py-4 ${
+                                        className={`${
                                             message.role === 'user' 
-                                                ? 'user-message-glossy text-white rounded-br-none' 
-                                                : 'assistant-message text-black dark:text-white rounded-bl-none'
+                                                ? 'max-w-fit rounded-2xl px-5 py-4 user-message-glossy text-white rounded-br-none' 
+                                                : 'px-5 py-4 text-black dark:text-white rounded-bl-none'
                                         }`}
                                     >
                                         {message.role === 'user' ? (
@@ -801,7 +801,7 @@ const AdminChat = () => {
                             {/* Display streaming message */}
                             {streamingMessage && (
                                 <div className="flex justify-start">
-                                    <div className="w-full max-w-[95%] rounded-2xl px-5 py-4 assistant-message text-black dark:text-white rounded-bl-none">
+                                    <div className="w-full rounded-2xl px-5 py-4 assistant-message text-black dark:text-white rounded-bl-none">
                                         <div className="markdown-content">
                                             <ReactMarkdown
                                                 remarkPlugins={[remarkGfm]}
@@ -868,7 +868,7 @@ const AdminChat = () => {
                             {/* Better loading animation - modified condition */}
                             {isLoading && !streamingMessage && messages.length > 0 && (
                                 <div className="flex justify-start">
-                                    <div className="max-w-[95%] w-full rounded-2xl px-5 py-4 assistant-message text-black dark:text-white rounded-bl-none flex items-center">
+                                    <div className="w-full rounded-2xl px-5 py-4 assistant-message text-black dark:text-white rounded-bl-none flex items-center">
                                         <div className="typing-animation flex">
                                             <span></span>
                                             <span></span>

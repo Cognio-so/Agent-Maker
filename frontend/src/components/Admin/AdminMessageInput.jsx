@@ -115,7 +115,7 @@ const AdminMessageInput = ({ onSubmit, onFileUpload, isLoading, currentGptName }
                                 className={`rounded-full w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center transition-all duration-200 ${
                                     !inputMessage.trim() || isLoading
                                     ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                    : 'bg-gray-700 hover:bg-gray-600 text-white'
                                 }`}
                                 disabled={!inputMessage.trim() || isLoading}
                                 aria-label="Send message"

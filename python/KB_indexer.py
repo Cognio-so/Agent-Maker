@@ -209,7 +209,25 @@ def process_single_file(file_url: str, splitter: RecursiveCharacterTextSplitter)
 
     return documents
 
-# --- Main Indexer Function ---
+# 1. Add function to optimize embedding with batching
+def get_embeddings_batch(texts, openai_api_key, batch_size=20):
+    """Process embeddings in batches for better throughput"""
+    import openai
+    openai.api_key = openai_api_key
+    
+    all_embeddings = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i+batch_size]
+        response = openai.Embedding.create(
+            input=batch,
+            model="text-embedding-ada-002"
+        )
+        batch_embeddings = [item["embedding"] for item in response["data"]]
+        all_embeddings.extend(batch_embeddings)
+    
+    return all_embeddings
+
+# 2. Update KB_indexer function to accept chunk_size parameter
 def KB_indexer(
     file_urls: List[str],
     qdrant_url: str,
@@ -217,7 +235,8 @@ def KB_indexer(
     collection_name: str,
     openai_api_key: Optional[str] = None,
     force_recreate_collection: bool = False,
-    max_workers: int = 15  # Increased from 10 to 15 for more parallelism
+    max_workers: int = 20,  # Increased from 15 to 20
+    chunk_size: int = 1024  # New parameter with larger default
 ) -> bool:
     """
     Indexes files from URLs into a Qdrant collection using OpenAI embeddings
@@ -235,6 +254,7 @@ def KB_indexer(
         force_recreate_collection: If True, deletes the collection if it exists before indexing.
                                    Use with caution in production.
         max_workers: Maximum number of parallel threads for downloading/parsing files.
+        chunk_size: Size of chunks to split text into for embedding
 
     Returns:
         True if the indexing process completed successfully (even if some files failed).
@@ -256,7 +276,7 @@ def KB_indexer(
             api_key=openai_api_key, # Pass key if provided, else None (reads from env)
             # Consider adding request_timeout if needed
             # request_timeout=60,
-            chunk_size=1500  # Increased from 1000 to 1500
+            chunk_size=chunk_size  # Use the provided chunk_size
         )
         # Optional: Perform a quick test embed to catch auth errors early
         # embedding_model.embed_query("test")
@@ -383,11 +403,9 @@ def KB_indexer(
         return False
 
     # 4. Initialize Text Splitter
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1200,  # Increased from 800 to 1200
-        chunk_overlap=150,  # Increased from 120 to 150
-        length_function=len,
-        is_separator_regex=False,
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=100
     )
 
     # 5. Process Files in Parallel
@@ -400,7 +418,7 @@ def KB_indexer(
     logger.info(f"Using up to {actual_max_workers} parallel workers for file processing.")
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=actual_max_workers) as executor:
-        future_to_url = {executor.submit(process_single_file, url, text_splitter): url for url in file_urls}
+        future_to_url = {executor.submit(process_single_file, url, splitter): url for url in file_urls}
 
         for future in concurrent.futures.as_completed(future_to_url):
             url = future_to_url[future]
@@ -469,7 +487,8 @@ def retrieve_documents(
     collection_name: str,
     openai_api_key: Optional[str] = None,
     top_k: int = 3,
-    prefix: str = ""
+    prefix: str = "",
+    score_threshold: float = 0.7  # Add score threshold to filter low-relevance docs
 ) -> List[Document]:
     """
     Retrieves relevant documents from a Qdrant collection using the query.
@@ -482,6 +501,7 @@ def retrieve_documents(
         openai_api_key: Optional OpenAI API Key
         top_k: Number of documents to retrieve
         prefix: Optional prefix to add to each document content
+        score_threshold: Threshold for filtering low-relevance documents
         
     Returns:
         List of Document objects matching the query
@@ -517,8 +537,12 @@ def retrieve_documents(
             for doc in retrieved_docs:
                 doc.page_content = f"{prefix} {doc.page_content}"
         
-        logger.info(f"Retrieved {len(retrieved_docs)} documents from {collection_name}")
-        return retrieved_docs
+        # Implement score threshold filtering
+        # This reduces processing of less relevant documents
+        filtered_docs = [doc for doc in retrieved_docs if doc.metadata.get('score', 0) >= score_threshold]
+        
+        logger.info(f"Retrieved {len(filtered_docs)} documents from {collection_name}")
+        return filtered_docs
         
     except Exception as e:
         logger.error(f"Error retrieving documents from {collection_name}: {e}", exc_info=True)
@@ -901,7 +925,8 @@ if __name__ == '__main__':
         collection_name=dynamic_collection_name,
         openai_api_key=None, # Set to your key string if not using env var, e.g., "sk-..."
         force_recreate_collection=True, # Be careful with True in production!
-        max_workers=5 # Adjust based on your machine/network
+        max_workers=5, # Adjust based on your machine/network
+        chunk_size=1024  # Add this parameter to increase chunk size
     )
 
     # --- 6. Result ---

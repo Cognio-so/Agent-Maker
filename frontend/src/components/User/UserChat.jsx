@@ -680,12 +680,10 @@ const UserChat = () => {
                                     </div>
                                 )}
                                 <div 
-                                    className={`max-w-[95%] sm:max-w-[85%] md:max-w-[80%] p-3 rounded-lg ${
+                                    className={`${
                                         msg.role === 'user' 
-                                            ? (isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white') 
-                                            : (msg.isError 
-                                                ? (isDarkMode ? 'bg-red-800/70 text-red-100' : 'bg-red-100 text-red-700') 
-                                                : (isDarkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-200 text-gray-800'))
+                                            ? 'max-w-fit p-3 rounded-lg user-message-glossy text-white rounded-br-none' 
+                                            : 'p-3 text-black dark:text-white rounded-bl-none'
                                     }`}
                                 >
                                     <ReactMarkdown 
@@ -758,7 +756,7 @@ const UserChat = () => {
                                     <IoSparkles size={16} className={isDarkMode ? 'text-blue-400' : 'text-blue-600'} />
                                 )}
                             </div>
-                            <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                            <div className={`w-full p-3 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
                                 <div className="flex space-x-1">
                                     <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1, repeat: Infinity, repeatDelay: 0.5, ease: "easeInOut" }} className={`w-2 h-2 rounded-full ${isDarkMode ? 'bg-gray-400' : 'bg-gray-500'}`}></motion.div>
                                     <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1, repeat: Infinity, delay: 0.2, repeatDelay: 0.5, ease: "easeInOut" }} className={`w-2 h-2 rounded-full ${isDarkMode ? 'bg-gray-400' : 'bg-gray-500'}`}></motion.div>

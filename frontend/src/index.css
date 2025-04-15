@@ -84,8 +84,8 @@
 
 /* User message glossy style */
 .user-message-glossy {
-    background: linear-gradient(135deg, #0f4faf 0%, #0062df 100%);
-    box-shadow: 0 8px 20px rgba(15, 79, 175, 0.25);
+    background: linear-gradient(135deg, #2f2f2f 0%, #393b3c 100%);
+    box-shadow: 0 8px 20px rgba(15, 44, 87, 0.25);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.12);
     position: relative;

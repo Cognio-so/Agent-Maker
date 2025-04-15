@@ -11,17 +11,17 @@ const User = require('../models/User');
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 20 * 1024 * 1024 } // 20MB limit
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB limit per file
 });
 
 // Define specific field handlers
 const handleImageUpload = upload.single('image');
-const handleKnowledgeUpload = upload.array('knowledgeFiles', 5);
+const handleKnowledgeUpload = upload.array('knowledgeFiles', 10); // Maximum 10 files
 
 // New combined middleware for handling both optional fields
 const handleCombinedUpload = upload.fields([
   { name: 'image', maxCount: 1 },
-  { name: 'knowledgeFiles', maxCount: 5 }
+  { name: 'knowledgeFiles', maxCount: 10 } // Maximum 10 files
 ]);
 
 // Create a new custom GPT
@@ -420,10 +420,10 @@ const deleteKnowledgeFile = async (req, res) => {
 
 const getAllCustomGpts = async (req, res) => {
   try {
-     
-    const filter = {};
+    // Filter to only show GPTs created by the current user
+    const filter = { createdBy: req.user._id };
 
-    const customGpts = await CustomGpt.find(filter); 
+    const customGpts = await CustomGpt.find(filter);
     res.status(200).json({
       success: true,
       customGpts

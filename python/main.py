@@ -11,6 +11,8 @@ import uuid
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
 from fastapi import WebSocket
+import concurrent.futures
+from functools import lru_cache
 
 # Load environment variables from .env file
 load_dotenv()
@@ -408,9 +410,6 @@ async def upload_chat_files(
     is_user_document: str = Form(default="false")
 ):
     try:
-        # Process files in parallel using ThreadPoolExecutor
-        import concurrent.futures
-        
         # Create temp directory to store uploaded files
         with tempfile.TemporaryDirectory() as temp_dir:
             # Save files to temp directory
@@ -444,7 +443,7 @@ async def upload_chat_files(
                 return dest_path
             
             # Process all files in parallel
-            with concurrent.futures.ThreadPoolExecutor(max_workers=min(10, len(file_paths))) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(20, len(file_paths))) as executor:
                 processed_paths = list(executor.map(process_file, file_paths))
         
         # If no files were processed, return error
@@ -470,7 +469,8 @@ async def upload_chat_files(
             collection_name=user_collection_name,
             openai_api_key=openai_api_key,
             force_recreate_collection=is_user_document.lower() == "true",
-            max_workers=min(15, len(processed_paths) * 2)  # Scale based on file count
+            max_workers=min(20, len(processed_paths) * 2),  # Increased parallelism
+            chunk_size=1024  # Add this parameter to increase chunk size
         )
         
         if success:
